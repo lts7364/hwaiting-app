@@ -1,0 +1,5 @@
+여기에 릴리즈 APK를 넣고 파일명을 아래처럼 맞추세요.
+
+hwaiting-v1-0-91-code92-k7p4x9.apk
+
+경로: files/hwaiting-v1-0-91-code92-k7p4x9.apk
