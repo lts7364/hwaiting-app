@@ -9,12 +9,39 @@
 <body>
   <main class="page narrow">
     <section class="hero small-hero">
-      <div class="badge">화이팅 다운로드</div>
+      <div class="badge">화이팅 이용하기</div>
       <h1>로그인</h1>
-      <p class="subtitle">가입하면 바로 다운로드할 수 있습니다. 다운로드 시 기록이 저장됩니다.</p>
+      <p class="subtitle">이미 가입했다면 로그인, 처음이라면 회원가입을 선택해 주세요.</p>
     </section>
 
-    <section class="card">
+    <section class="card" id="modeCard">
+      <h2>시작하기</h2>
+      <div class="mode-grid">
+        <button class="mode-card" id="showLogin" type="button">
+          <b>로그인</b>
+          <span>이미 가입한 경우</span>
+        </button>
+        <button class="mode-card" id="showSignup" type="button">
+          <b>처음 이용해요</b>
+          <span>처음 사용하는 경우</span>
+        </button>
+      </div>
+    </section>
+
+    <section class="card hidden" id="loginCard">
+      <h2>로그인</h2>
+      <div class="form">
+        <input id="loginEmail" type="email" placeholder="이메일" autocomplete="email" />
+        <input id="loginPassword" type="password" placeholder="비밀번호" autocomplete="current-password" />
+        <button class="btn primary full" id="loginBtn">로그인</button>
+      </div>
+      <div class="text-links">
+        <button id="toSignup" type="button">처음 이용해요</button>
+        <a href="index.html">홈으로</a>
+      </div>
+    </section>
+
+    <section class="card hidden" id="signupCard">
       <h2>회원가입</h2>
       <div class="form">
         <input id="signupName" placeholder="이름" autocomplete="name" />
@@ -22,26 +49,21 @@
         <input id="signupEmail" type="email" placeholder="이메일" autocomplete="email" />
         <input id="signupPassword" type="password" placeholder="비밀번호" autocomplete="new-password" />
         <input id="signupPassword2" type="password" placeholder="비밀번호 확인" autocomplete="new-password" />
-        <button class="btn primary full" id="signupBtn">가입하고 다운로드로 이동</button>
+        <button class="btn primary full" id="signupBtn">회원가입</button>
+      </div>
+      <div class="text-links">
+        <button id="toLogin" type="button">이미 가입했어요</button>
+        <a href="index.html">홈으로</a>
       </div>
     </section>
 
-    <section class="card">
-      <h2>로그인</h2>
-      <div class="form">
-        <input id="loginEmail" type="email" placeholder="이메일" autocomplete="email" />
-        <input id="loginPassword" type="password" placeholder="비밀번호" autocomplete="current-password" />
-        <button class="btn secondary full" id="loginBtn">로그인</button>
-      </div>
-    </section>
-
-    <section class="card">
-      <h2>현재 상태</h2>
+    <section class="card done-card hidden" id="loggedInCard">
+      <h2>로그인 완료</h2>
       <p id="status" class="small">확인 중...</p>
-      <div class="actions left">
-        <a class="btn secondary" href="index.html">홈</a>
-        <a class="btn secondary" href="download.html">다운로드</a>
-        <button class="btn danger" id="logoutBtn" style="display:none;">로그아웃</button>
+      <div class="actions">
+        <a class="btn primary" href="download.html">다운로드로 이동</a>
+        <a class="btn secondary" href="request.html">요청함</a>
+        <button class="btn danger" id="logoutBtn">로그아웃</button>
       </div>
     </section>
   </main>
@@ -60,9 +82,19 @@
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
-
     const $ = id => document.getElementById(id);
-    const status = $("status");
+
+    function showMode(mode) {
+      $("modeCard").classList.add("hidden");
+      $("loginCard").classList.toggle("hidden", mode !== "login");
+      $("signupCard").classList.toggle("hidden", mode !== "signup");
+      $("loggedInCard").classList.add("hidden");
+    }
+
+    $("showLogin").addEventListener("click", () => showMode("login"));
+    $("showSignup").addEventListener("click", () => showMode("signup"));
+    $("toSignup").addEventListener("click", () => showMode("signup"));
+    $("toLogin").addEventListener("click", () => showMode("login"));
 
     async function createUserProfile(user, name, department) {
       const role = user.email === ADMIN_EMAIL ? "admin" : "user";
@@ -96,14 +128,17 @@
       }
 
       try {
-        status.textContent = "가입 처리 중...";
+        $("signupBtn").disabled = true;
+        $("signupBtn").textContent = "가입 중...";
         const cred = await createUserWithEmailAndPassword(auth, email, password);
         await updateProfile(cred.user, { displayName: name });
         await createUserProfile(cred.user, name, department);
         location.href = "download.html";
       } catch (e) {
         alert("회원가입 실패: " + e.message);
-        status.textContent = "회원가입 실패";
+      } finally {
+        $("signupBtn").disabled = false;
+        $("signupBtn").textContent = "회원가입";
       }
     });
 
@@ -115,7 +150,8 @@
         return;
       }
       try {
-        status.textContent = "로그인 중...";
+        $("loginBtn").disabled = true;
+        $("loginBtn").textContent = "로그인 중...";
         const cred = await signInWithEmailAndPassword(auth, email, password);
         const snap = await getDoc(doc(db, "users", cred.user.uid));
         if (!snap.exists()) {
@@ -125,7 +161,9 @@
         location.href = "download.html";
       } catch (e) {
         alert("로그인 실패: " + e.message);
-        status.textContent = "로그인 실패";
+      } finally {
+        $("loginBtn").disabled = false;
+        $("loginBtn").textContent = "로그인";
       }
     });
 
@@ -135,15 +173,19 @@
     });
 
     onAuthStateChanged(auth, async user => {
-      if (!user) {
-        status.textContent = "로그인되어 있지 않습니다.";
-        $("logoutBtn").style.display = "none";
-        return;
+      if (!user) return;
+      $("modeCard").classList.add("hidden");
+      $("loginCard").classList.add("hidden");
+      $("signupCard").classList.add("hidden");
+      $("loggedInCard").classList.remove("hidden");
+
+      try {
+        const snap = await getDoc(doc(db, "users", user.uid));
+        const data = snap.exists() ? snap.data() : {};
+        $("status").textContent = `${data.name || user.email}님, 로그인되어 있습니다.`;
+      } catch (e) {
+        $("status").textContent = `${user.email} 로그인됨`;
       }
-      const snap = await getDoc(doc(db, "users", user.uid));
-      const data = snap.exists() ? snap.data() : {};
-      status.textContent = `${data.name || user.email} / ${data.department || "-"} / ${user.email}`;
-      $("logoutBtn").style.display = "inline-flex";
     });
   </script>
 </body>

@@ -11,35 +11,33 @@
     <section class="hero small-hero">
       <div class="badge">APK 다운로드</div>
       <h1>다운로드</h1>
-      <p class="subtitle">로그인 후 APK를 다운로드할 수 있습니다.</p>
+      <p class="subtitle">로그인 후 화이팅 앱을 다운로드할 수 있습니다.</p>
     </section>
 
     <section class="card notice-card">
       <h2>다운로드 전 안내</h2>
-      <p>
-        이 앱은 개인 편의를 위한 비공식 앱이며, 회사 또는 특정 기관의 공식 앱이 아닙니다.
-        근무 정보는 참고용이므로 실제 근무표와 공식 공지를 우선 확인해 주세요.
-      </p>
-      <p>
-        
-        무단 재배포는 권장하지 않습니다.
-      </p>
+      <p>이 앱은 개인 편의를 위한 비공식 앱이며, 회사 또는 특정 기관의 공식 앱이 아닙니다.</p>
+      <p>근무 정보는 참고용이므로 실제 근무표와 공식 공지를 우선 확인해 주세요.</p>
+      <p>무단 재배포는 권장하지 않습니다.</p>
+    </section>
+
+    <section class="card done-card">
+      <h2 id="downloadTitle" class="download-title">확인 중...</h2>
+      <p id="userInfo" class="small">로그인 상태를 확인하고 있습니다.</p>
+      <p id="downloadStatus" class="small top-gap"></p>
+      <div class="actions">
+        <button class="btn primary" id="downloadBtn" style="display:none;">APK 다운로드</button>
+        <a class="btn primary" id="loginLink" href="login.html" style="display:none;">로그인 / 회원가입</a>
+      </div>
+      <div class="text-links" id="subLinks" style="display:none;">
+        <a href="request.html">요청함에 남기기</a>
+        <button id="logoutBtn" type="button">로그아웃</button>
+      </div>
     </section>
 
     <section class="card">
-      <h2>사용자 정보</h2>
-      <p id="userInfo" class="small">확인 중...</p>
-      <p id="downloadStatus" class="small"></p>
-      <div class="actions left">
-        <button class="btn primary" id="downloadBtn" style="display:none;">APK 다운로드</button>
-        <a class="btn secondary" id="loginLink" href="login.html" style="display:none;">로그인</a>
-        <button class="btn secondary" id="logoutBtn" style="display:none;">로그아웃</button>
-        <a class="btn secondary" href="request.html">가입자 익명 요청함</a>
-      </div>
-    </section>
-<section class="card warn">
-      <h2>안내</h2>
-      <p>APK 설치 시 알 수 없는 앱 설치 허용이 필요할 수 있습니다.</p>
+      <h2>설치 안내</h2>
+      <p class="small">APK 설치 시 휴대폰 설정에서 “알 수 없는 앱 설치 허용”이 필요할 수 있습니다.</p>
     </section>
   </main>
 
@@ -54,7 +52,6 @@
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
-
     const $ = id => document.getElementById(id);
     let currentUser = null;
     let currentProfile = null;
@@ -83,30 +80,32 @@
     onAuthStateChanged(auth, async user => {
       currentUser = user;
       if (!user) {
-        $("userInfo").textContent = "로그인이 필요합니다.";
+        $("downloadTitle").textContent = "로그인이 필요합니다";
+        $("userInfo").textContent = "앱을 받으려면 먼저 로그인하거나 회원가입해 주세요.";
         $("loginLink").style.display = "inline-flex";
         $("downloadBtn").style.display = "none";
-        $("logoutBtn").style.display = "none";
+        $("subLinks").style.display = "none";
         return;
       }
 
       try {
         currentProfile = await ensureProfile(user);
-        $("logoutBtn").style.display = "inline-flex";
+        $("subLinks").style.display = "flex";
         $("loginLink").style.display = "none";
 
-        const name = currentProfile.name || user.email;
-        const dept = currentProfile.department || "-";
-        $("userInfo").textContent = `${name} / ${dept} / ${user.email}`;
-
         if (currentProfile.blocked === true) {
-          $("downloadStatus").textContent = "이 계정은 다운로드가 차단되었습니다. 관리자에게 문의하세요.";
+          $("downloadTitle").textContent = "다운로드 불가";
+          $("userInfo").textContent = "이 계정은 다운로드가 차단되었습니다.";
           $("downloadBtn").style.display = "none";
-        } else {
-          $("downloadStatus").textContent = "다운로드 가능합니다.";
-          $("downloadBtn").style.display = "inline-flex";
+          return;
         }
+
+        $("downloadTitle").textContent = "다운로드 준비 완료";
+        $("userInfo").textContent = `${currentProfile.name || "사용자"}님, 화이팅 앱을 다운로드할 수 있습니다.`;
+        $("downloadStatus").textContent = `최신 버전 ${APP_VERSION.versionName}`;
+        $("downloadBtn").style.display = "inline-flex";
       } catch (e) {
+        $("downloadTitle").textContent = "확인 실패";
         $("userInfo").textContent = "사용자 정보를 불러오지 못했습니다.";
         $("downloadStatus").textContent = e.message;
       }
@@ -114,7 +113,6 @@
 
     $("downloadBtn").addEventListener("click", async () => {
       if (!currentUser || !currentProfile) {
-        alert("로그인이 필요합니다.");
         location.href = "login.html";
         return;
       }

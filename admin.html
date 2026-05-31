@@ -47,7 +47,7 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
     import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
     import {
-      getFirestore, doc, getDoc, getDocs, collection, updateDoc, serverTimestamp
+      getFirestore, doc, getDoc, getDocs, collection, updateDoc, deleteDoc, serverTimestamp
     } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
     import { firebaseConfig, ADMIN_EMAIL } from "./firebase-config.js";
 
@@ -82,18 +82,15 @@
     async function loadUsers() {
       const list = $("usersList");
       list.innerHTML = "<p class='small'>불러오는 중...</p>";
-
       try {
         const snap = await getDocs(collection(db, "users"));
         const users = [];
         snap.forEach(docSnap => users.push({ id: docSnap.id, ...docSnap.data() }));
         users.sort((a, b) => (a.email || "").localeCompare(b.email || ""));
-
         if (users.length === 0) {
           list.innerHTML = "<p class='small'>사용자가 없습니다.</p>";
           return;
         }
-
         list.innerHTML = "";
         users.forEach(user => {
           const row = document.createElement("div");
@@ -124,7 +121,6 @@
     async function loadLogs() {
       const list = $("logsList");
       list.innerHTML = "<p class='small'>불러오는 중...</p>";
-
       try {
         const snap = await getDocs(collection(db, "downloadLogs"));
         const logs = [];
@@ -134,12 +130,10 @@
           const bt = b.downloadedAt && b.downloadedAt.toMillis ? b.downloadedAt.toMillis() : 0;
           return bt - at;
         });
-
         if (logs.length === 0) {
           list.innerHTML = "<p class='small'>다운로드 기록이 없습니다.</p>";
           return;
         }
-
         list.innerHTML = "";
         logs.forEach(log => {
           const row = document.createElement("div");
@@ -161,7 +155,6 @@
     async function loadRequests() {
       const list = $("requestsList");
       list.innerHTML = "<p class='small'>불러오는 중...</p>";
-
       try {
         const snap = await getDocs(collection(db, "requests"));
         const requests = [];
@@ -171,19 +164,15 @@
           const bt = b.createdAt && b.createdAt.toMillis ? b.createdAt.toMillis() : 0;
           return bt - at;
         });
-
         if (requests.length === 0) {
           list.innerHTML = "<p class='small'>등록된 요청이 없습니다.</p>";
           return;
         }
-
         const statuses = ["접수", "검토중", "적용완료", "보류", "거절"];
-
         list.innerHTML = "";
         requests.forEach(req => {
           const row = document.createElement("div");
           row.className = "item vertical";
-
           row.innerHTML = `
             <div class="item-head">
               <b>${escapeHtml(req.title || "-")}</b>
@@ -192,10 +181,8 @@
             <div class="meta">${escapeHtml(req.category || "-")} · 익명 요청 · ${formatTime(req.createdAt)}</div>
             <div class="request-content">${escapeHtml(req.content || "")}</div>
           `;
-
           const control = document.createElement("div");
           control.className = "actions left no-top";
-
           statuses.forEach(status => {
             const btn = document.createElement("button");
             btn.className = status === (req.status || "접수") ? "btn primary mini" : "btn secondary mini";
@@ -209,6 +196,16 @@
             });
             control.appendChild(btn);
           });
+
+          const deleteBtn = document.createElement("button");
+          deleteBtn.className = "btn danger mini";
+          deleteBtn.textContent = "삭제";
+          deleteBtn.addEventListener("click", async () => {
+            if (!confirm("이 요청을 삭제할까요? 삭제하면 다시 복구할 수 없습니다.")) return;
+            await deleteDoc(doc(db, "requests", req.id));
+            await loadRequests();
+          });
+          control.appendChild(deleteBtn);
 
           row.appendChild(control);
           list.appendChild(row);
@@ -243,7 +240,6 @@
         const snap = await getDoc(doc(db, "users", user.uid));
         profile = snap.exists() ? snap.data() : {};
       } catch (e) {
-        // 관리자 이메일은 Firestore users 문서 읽기 실패해도 화면 접근은 허용한다.
         profile = {};
       }
 

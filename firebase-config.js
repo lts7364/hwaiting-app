@@ -1,4 +1,3 @@
-// Firebase / 화이팅 앱 공통 설정
 export const firebaseConfig = {
   apiKey: "AIzaSyDFGejarmyxZLLAvHzJDtHcZCafqxKZrl0",
   authDomain: "hwaiting-app.firebaseapp.com",
@@ -15,6 +14,4 @@ export const APP_VERSION = {
   versionCode: 92
 };
 
-// APK는 Netlify에 두되, 뻔한 app-release.apk 대신 긴 파일명으로 둔다.
-// download.html에서 로그인/기록 저장 후 이 파일을 열어준다.
 export const APK_FILE = "files/hwaiting-v1-0-91-code92-k7p4x9.apk";

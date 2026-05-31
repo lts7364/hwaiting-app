@@ -10,26 +10,19 @@
   <main class="page">
     <section class="hero small-hero">
       <div class="badge">가입자 익명 요청함</div>
-      <h1>익명 요청함</h1>
-      <p class="subtitle">
-        로그인한 사람만 작성할 수 있지만, 관리자 화면에는 작성자 정보가 표시되지 않습니다.
-      </p>
-      <div class="actions">
-        <a class="btn secondary" href="index.html">홈</a>
-        <a class="btn secondary" href="download.html">다운로드</a>
-        <a class="btn secondary" href="login.html" id="loginTopLink">로그인</a>
-        <button class="btn danger" id="logoutBtn" style="display:none;">로그아웃</button>
+      <h1>요청함</h1>
+      <p class="subtitle">로그인한 사람만 작성할 수 있지만, 관리자 화면에는 작성자 정보가 표시되지 않습니다.</p>
+      <div class="text-links">
+        <a href="index.html">홈</a>
+        <a href="download.html">다운로드</a>
+        <a href="guide.html">사용설명서</a>
       </div>
     </section>
 
     <section class="card notice-card">
       <h2>안내</h2>
-      <p>
-        요청은 익명으로 접수됩니다. 관리자 화면에는 이름, 부서, 이메일이 표시되지 않습니다.
-      </p>
-      <p>
-        다만 장난글 방지를 위해 로그인한 사용자만 작성할 수 있고, 본인은 아래에서 자기 요청 상태를 확인할 수 있습니다.
-      </p>
+      <p>기능 추가나 오류 내용을 편하게 남겨주세요.</p>
+      <p>처리 결과가 나온 요청은 본인이 삭제할 수 있습니다.</p>
     </section>
 
     <section class="card">
@@ -63,10 +56,10 @@
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
-    import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
     import {
       getFirestore, doc, getDoc, addDoc, collection, serverTimestamp,
-      getDocs, query, where
+      getDocs, query, where, deleteDoc
     } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
     import { firebaseConfig } from "./firebase-config.js";
 
@@ -74,7 +67,6 @@
     const auth = getAuth(app);
     const db = getFirestore(app);
     const $ = id => document.getElementById(id);
-
     let currentUser = null;
     let currentProfile = null;
 
@@ -102,6 +94,10 @@
       if (status === "검토중") return "status progress";
       if (status === "보류" || status === "거절") return "status hold";
       return "status";
+    }
+
+    function canUserDeleteRequest(status) {
+      return status === "적용완료" || status === "보류" || status === "거절";
     }
 
     async function loadMyRequests() {
@@ -139,6 +135,26 @@
             <div class="meta">${escapeHtml(req.category || "-")} · ${formatTime(req.createdAt)}</div>
             <div class="request-content">${escapeHtml(req.content || "")}</div>
           `;
+
+          if (canUserDeleteRequest(req.status || "접수")) {
+            const actions = document.createElement("div");
+            actions.className = "actions left no-top";
+            const deleteBtn = document.createElement("button");
+            deleteBtn.className = "btn danger mini";
+            deleteBtn.textContent = "삭제";
+            deleteBtn.addEventListener("click", async () => {
+              if (!confirm("처리 결과가 나온 요청입니다. 이 요청을 삭제할까요? 삭제하면 다시 복구할 수 없습니다.")) return;
+              try {
+                await deleteDoc(doc(db, "requests", req.id));
+                await loadMyRequests();
+              } catch (e) {
+                alert("삭제 실패: " + e.message);
+              }
+            });
+            actions.appendChild(deleteBtn);
+            item.appendChild(actions);
+          }
+
           box.appendChild(item);
         });
       } catch (e) {
@@ -195,11 +211,6 @@
       }
     });
 
-    $("logoutBtn").addEventListener("click", async () => {
-      await signOut(auth);
-      location.reload();
-    });
-
     onAuthStateChanged(auth, async user => {
       currentUser = user;
 
@@ -207,8 +218,6 @@
         currentProfile = null;
         $("userInfo").innerHTML = "로그인이 필요합니다. <a href='login.html'>로그인 / 회원가입</a>";
         $("requestFormCard").style.display = "none";
-        $("logoutBtn").style.display = "none";
-        $("loginTopLink").style.display = "inline-flex";
         await loadMyRequests();
         return;
       }
@@ -216,9 +225,6 @@
       try {
         const snap = await getDoc(doc(db, "users", user.uid));
         currentProfile = snap.exists() ? snap.data() : {};
-        $("logoutBtn").style.display = "inline-flex";
-        $("loginTopLink").style.display = "none";
-
         if (currentProfile.blocked === true) {
           $("userInfo").textContent = "로그인됨 / 차단된 계정입니다. 요청을 작성할 수 없습니다.";
           $("requestFormCard").style.display = "none";
@@ -226,7 +232,6 @@
           $("userInfo").textContent = "로그인됨 / 익명 요청 작성 가능";
           $("requestFormCard").style.display = "block";
         }
-
         await loadMyRequests();
       } catch (e) {
         $("userInfo").textContent = "사용자 정보를 불러오지 못했습니다: " + e.message;

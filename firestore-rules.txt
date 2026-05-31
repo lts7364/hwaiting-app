@@ -10,32 +10,31 @@ service cloud.firestore {
       return signedIn() && request.auth.uid == uid;
     }
 
-    function adminUserDoc() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid));
+    function isAdminEmail() {
+      return signedIn() && request.auth.token.email == "lts7364@gmail.com";
+    }
+
+    function hasAdminRole() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin";
     }
 
     function isAdmin() {
-      return signedIn()
-        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
-        && adminUserDoc().data.role == "admin";
+      return isAdminEmail() || hasAdminRole();
     }
 
     function isNotBlocked() {
       return signedIn()
         && exists(/databases/$(database)/documents/users/$(request.auth.uid))
-        && adminUserDoc().data.blocked != true;
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.blocked != true;
     }
 
     match /users/{uid} {
       allow create: if isSelf(uid)
         && request.resource.data.email == request.auth.token.email
         && request.resource.data.approved == true
-        && request.resource.data.blocked == false
-        && (
-          (request.auth.token.email == "lts7364@gmail.com" && request.resource.data.role == "admin")
-          ||
-          (request.auth.token.email != "lts7364@gmail.com" && request.resource.data.role == "user")
-        );
+        && request.resource.data.blocked == false;
 
       allow read: if isSelf(uid) || isAdmin();
       allow update: if isAdmin();
@@ -49,16 +48,14 @@ service cloud.firestore {
     }
 
     match /requests/{requestId} {
-      // 가입자 익명 요청함: 로그인한 사용자만 작성 가능, 차단된 사용자는 작성 불가
       allow create: if signedIn()
         && isNotBlocked()
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.anonymous == true;
 
-      // 관리자는 전체 확인/상태 변경 가능
-      // 작성자는 자기 요청만 상태 확인 가능
       allow read: if isAdmin() || (signedIn() && resource.data.uid == request.auth.uid);
-      allow update, delete: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin() || (signedIn() && resource.data.uid == request.auth.uid && resource.data.status in ["적용완료", "보류", "거절"]);
     }
   }
 }
