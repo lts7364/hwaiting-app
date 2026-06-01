@@ -334,6 +334,25 @@ input:focus, select:focus, textarea:focus {
   border-color: #e8ca71;
 }
 
+.guide-image-card {
+  background: #fffdf7;
+}
+
+.guide-image-link {
+  display: block;
+  margin-top: 12px;
+  border-radius: 18px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: white;
+}
+
+.guide-main-image {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
 footer {
   text-align: center;
   margin-top: 18px;
