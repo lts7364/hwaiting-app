@@ -97,6 +97,7 @@ h2 {
 }
 
 .btn.primary { background: var(--green); color: white; }
+.btn:disabled { opacity: 0.55; cursor: not-allowed; filter: grayscale(0.15); }
 .btn.secondary { background: white; color: var(--text); border-color: #ded3c2; }
 .btn.danger { background: var(--danger); color: white; }
 .btn.full { width: 100%; }

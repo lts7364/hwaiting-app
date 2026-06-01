@@ -55,6 +55,70 @@
     const $ = id => document.getElementById(id);
     let currentUser = null;
     let currentProfile = null;
+    let downloadInProgress = false;
+    let cooldownTimer = null;
+
+    const DOWNLOAD_COOLDOWN_MS = 60 * 1000;
+
+    function downloadLockKey() {
+      if (!currentUser) return null;
+      return `hwaitingDownloadCooldown:${currentUser.uid}:${APP_VERSION.versionCode}`;
+    }
+
+    function getCooldownRemainingMs() {
+      const key = downloadLockKey();
+      if (!key) return 0;
+      const until = Number(localStorage.getItem(key) || 0);
+      return Math.max(0, until - Date.now());
+    }
+
+    function setDownloadCooldown() {
+      const key = downloadLockKey();
+      if (!key) return;
+      localStorage.setItem(key, String(Date.now() + DOWNLOAD_COOLDOWN_MS));
+    }
+
+    function clearCooldownTimer() {
+      if (cooldownTimer) {
+        clearInterval(cooldownTimer);
+        cooldownTimer = null;
+      }
+    }
+
+    function updateDownloadButtonState() {
+      const btn = $("downloadBtn");
+      if (!btn || btn.style.display === "none") return;
+
+      const remaining = getCooldownRemainingMs();
+      if (downloadInProgress) {
+        btn.disabled = true;
+        btn.textContent = "다운로드 준비 중...";
+        return;
+      }
+
+      if (remaining > 0) {
+        const seconds = Math.ceil(remaining / 1000);
+        btn.disabled = true;
+        btn.textContent = `${seconds}초 후 다시 가능`;
+        $("downloadStatus").textContent = "연속 클릭 방지를 위해 잠시 후 다시 다운로드할 수 있습니다.";
+        return;
+      }
+
+      btn.disabled = false;
+      btn.textContent = "APK 다운로드";
+      $("downloadStatus").textContent = `최신 버전 ${APP_VERSION.versionName}`;
+    }
+
+    function startCooldownWatcher() {
+      clearCooldownTimer();
+      updateDownloadButtonState();
+      cooldownTimer = setInterval(() => {
+        updateDownloadButtonState();
+        if (!downloadInProgress && getCooldownRemainingMs() <= 0) {
+          clearCooldownTimer();
+        }
+      }, 1000);
+    }
 
     async function ensureProfile(user) {
       const ref = doc(db, "users", user.uid);
@@ -79,6 +143,9 @@
 
     onAuthStateChanged(auth, async user => {
       currentUser = user;
+      clearCooldownTimer();
+      downloadInProgress = false;
+
       if (!user) {
         $("downloadTitle").textContent = "로그인이 필요합니다";
         $("userInfo").textContent = "앱을 받으려면 먼저 로그인하거나 회원가입해 주세요.";
@@ -102,8 +169,8 @@
 
         $("downloadTitle").textContent = "다운로드 준비 완료";
         $("userInfo").textContent = `${currentProfile.name || "사용자"}님, 화이팅 앱을 다운로드할 수 있습니다.`;
-        $("downloadStatus").textContent = `최신 버전 ${APP_VERSION.versionName}`;
         $("downloadBtn").style.display = "inline-flex";
+        startCooldownWatcher();
       } catch (e) {
         $("downloadTitle").textContent = "확인 실패";
         $("userInfo").textContent = "사용자 정보를 불러오지 못했습니다.";
@@ -121,8 +188,17 @@
         return;
       }
 
+      if (downloadInProgress || getCooldownRemainingMs() > 0) {
+        updateDownloadButtonState();
+        return;
+      }
+
+      downloadInProgress = true;
+      setDownloadCooldown();
+      updateDownloadButtonState();
+
       try {
-        $("downloadStatus").textContent = "다운로드 준비 중...";
+        $("downloadStatus").textContent = "다운로드 준비 중입니다. 잠시만 기다려 주세요.";
         await addDoc(collection(db, "downloadLogs"), {
           uid: currentUser.uid,
           email: currentUser.email,
@@ -136,9 +212,18 @@
           userAgent: navigator.userAgent
         });
 
-        $("downloadStatus").textContent = "APK 다운로드를 시작합니다.";
+        $("downloadStatus").textContent = "APK 다운로드를 시작합니다. 중복 클릭 방지를 위해 60초 후 다시 받을 수 있습니다.";
+        startCooldownWatcher();
+        setTimeout(() => {
+          downloadInProgress = false;
+          updateDownloadButtonState();
+        }, 2500);
         window.location.href = APK_FILE;
       } catch (e) {
+        const key = downloadLockKey();
+        if (key) localStorage.removeItem(key);
+        downloadInProgress = false;
+        updateDownloadButtonState();
         alert("다운로드 실패: " + e.message);
         $("downloadStatus").textContent = "다운로드 실패";
       }
