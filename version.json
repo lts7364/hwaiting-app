@@ -1,16 +1,17 @@
 {
-  "versionName": "1.0.91-native",
-  "versionCode": 92,
+  "versionName": "1.0.100-native",
+  "versionCode": 101,
   "downloadMode": "login-log-auto-approve",
   "downloadPageUrl": "https://lts7364.github.io/hwaiting-app/download.html",
   "apkUrl": "https://lts7364.github.io/hwaiting-app/download.html",
   "forceUpdate": false,
-  "updatedAt": "2026-05-31",
+  "updatedAt": "2026-06-04",
   "changelog": [
-    "공휴일 근무 선택 항목 정리",
-    "휴일조출 추가",
-    "평일 2근 조출 추가",
-    "통계 기록 표시 개선",
-    "업데이트 확인 기능 개선"
+    "업무 바로가기 5개/10개 위젯 추가",
+    "바로가기 위젯 전용 순서 설정 추가",
+    "바로가기 위젯 로고와 글씨 비율 개선",
+    "전체조 화면 흰색 정리 및 선택 조 색상 표시 개선",
+    "전체조 오늘 표시 개선",
+    "알람음 찾아보기 기능 추가"
   ]
 }

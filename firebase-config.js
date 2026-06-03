@@ -10,8 +10,8 @@ export const firebaseConfig = {
 export const ADMIN_EMAIL = "lts7364@gmail.com";
 
 export const APP_VERSION = {
-  versionName: "1.0.91-native",
-  versionCode: 92
+  versionName: "1.0.100-native",
+  versionCode: 101
 };
 
-export const APK_FILE = "files/hwaiting-v1-0-91-code92-k7p4x9.apk";
+export const APK_FILE = "files/hwaiting-v1-0-100-code101-k7p4x9.apk";
