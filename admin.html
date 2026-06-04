@@ -32,7 +32,13 @@
 
     <section class="card" id="logsCard" style="display:none;">
       <h2>다운로드 기록</h2>
-      <button class="btn secondary" id="refreshLogsBtn">기록 새로고침</button>
+      <div class="actions left no-top" style="gap:8px; flex-wrap:wrap;">
+        <button class="btn secondary mini" id="refreshLogsBtn">기록 새로고침</button>
+        <button class="btn secondary mini" id="collapseLogsBtn">이름별 접기</button>
+        <button class="btn secondary mini" id="expandLogsBtn">전체 펼치기</button>
+        <button class="btn danger mini" id="deleteAllLogsBtn">전체 기록 삭제</button>
+      </div>
+      <p class="small">이름/이메일별로 묶어서 표시합니다. 삭제 기능을 쓰려면 Firestore Rules도 같이 교체해야 합니다.</p>
       <div id="logsList" class="list"></div>
     </section>
 
@@ -45,9 +51,9 @@
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
-    import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
+    import { getAuth, onAuthStateChanged, signOut, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
     import {
-      getFirestore, doc, getDoc, getDocs, collection, updateDoc, deleteDoc, serverTimestamp
+      getFirestore, doc, getDoc, getDocs, collection, updateDoc, deleteDoc, writeBatch, serverTimestamp
     } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
     import { firebaseConfig, ADMIN_EMAIL } from "./firebase-config.js";
 
@@ -79,6 +85,21 @@
       $(targetId).innerHTML = `<p class="small">불러오기 실패: ${escapeHtml(message)}</p>`;
     }
 
+    async function sendResetMailToUser(user) {
+      const email = (user && user.email ? String(user.email) : "").trim();
+      if (!email) {
+        alert("이 사용자의 이메일이 없어 비밀번호 초기화를 보낼 수 없습니다.");
+        return;
+      }
+      if (!confirm(`${email}\n\n이 이메일로 비밀번호 재설정 메일을 보낼까요?`)) return;
+      try {
+        await sendPasswordResetEmail(auth, email);
+        alert("비밀번호 재설정 메일을 보냈습니다.\n사용자가 메일에서 새 비밀번호를 설정하면 됩니다.");
+      } catch (e) {
+        alert("비밀번호 초기화 메일 전송 실패: " + (e.message || e));
+      }
+    }
+
     async function loadUsers() {
       const list = $("usersList");
       list.innerHTML = "<p class='small'>불러오는 중...</p>";
@@ -103,18 +124,69 @@
               <div class="meta">${blocked ? "차단됨" : "사용 가능"}</div>
             </div>
           `;
-          const btn = document.createElement("button");
-          btn.className = blocked ? "btn secondary mini" : "btn danger mini";
-          btn.textContent = blocked ? "차단해제" : "차단";
-          btn.addEventListener("click", async () => {
+
+          const controls = document.createElement("div");
+          controls.className = "actions left no-top";
+          controls.style.gap = "6px";
+          controls.style.flexWrap = "wrap";
+          controls.style.justifyContent = "flex-end";
+
+          const resetBtn = document.createElement("button");
+          resetBtn.className = "btn secondary mini";
+          resetBtn.textContent = "비번초기화";
+          resetBtn.addEventListener("click", () => sendResetMailToUser(user));
+          controls.appendChild(resetBtn);
+
+          const blockBtn = document.createElement("button");
+          blockBtn.className = blocked ? "btn secondary mini" : "btn danger mini";
+          blockBtn.textContent = blocked ? "차단해제" : "차단";
+          blockBtn.addEventListener("click", async () => {
             await updateDoc(doc(db, "users", user.id), { blocked: !blocked, updatedAt: serverTimestamp() });
             await loadUsers();
           });
-          row.appendChild(btn);
+          controls.appendChild(blockBtn);
+
+          row.appendChild(controls);
           list.appendChild(row);
         });
       } catch (e) {
         showError("usersList", e.message);
+      }
+    }
+
+    let currentLogs = [];
+    let logsCollapsed = true;
+
+    function logGroupKey(log) {
+      const email = (log.email || "").trim();
+      if (email) return email.toLowerCase();
+      return `${log.name || "-"}|${log.department || "-"}`;
+    }
+
+    function logGroupTitle(logs) {
+      const first = logs[0] || {};
+      const name = first.name || "-";
+      const dept = first.department || "-";
+      const email = first.email || "-";
+      const latest = logs[0] ? formatTime(logs[0].downloadedAt) : "-";
+      return `${name} / ${dept} · ${email} · ${logs.length}건 · 최근 ${latest}`;
+    }
+
+    async function deleteLogsByIds(ids, afterDone) {
+      if (!ids || ids.length === 0) return;
+      try {
+        // Firestore batch는 500개 제한이 있어 안전하게 450개씩 나눠 삭제합니다.
+        for (let i = 0; i < ids.length; i += 450) {
+          const batch = writeBatch(db);
+          ids.slice(i, i + 450).forEach(id => {
+            batch.delete(doc(db, "downloadLogs", id));
+          });
+          await batch.commit();
+        }
+        if (afterDone) alert(afterDone);
+        await loadLogs();
+      } catch (e) {
+        alert("삭제 실패: " + (e.message || e));
       }
     }
 
@@ -130,22 +202,90 @@
           const bt = b.downloadedAt && b.downloadedAt.toMillis ? b.downloadedAt.toMillis() : 0;
           return bt - at;
         });
+        currentLogs = logs;
         if (logs.length === 0) {
           list.innerHTML = "<p class='small'>다운로드 기록이 없습니다.</p>";
           return;
         }
-        list.innerHTML = "";
+
+        const groups = new Map();
         logs.forEach(log => {
-          const row = document.createElement("div");
-          row.className = "item";
-          row.innerHTML = `
-            <div>
-              <b>${escapeHtml(log.name || "-")} / ${escapeHtml(log.department || "-")}</b>
-              <div class="meta">${escapeHtml(log.email || "-")} · ${escapeHtml(log.versionName || "-")} (${escapeHtml(log.versionCode || "-")})</div>
-              <div class="meta">${formatTime(log.downloadedAt)}</div>
+          const key = logGroupKey(log);
+          if (!groups.has(key)) groups.set(key, []);
+          groups.get(key).push(log);
+        });
+
+        const grouped = Array.from(groups.values()).sort((a, b) => {
+          const at = a[0] && a[0].downloadedAt && a[0].downloadedAt.toMillis ? a[0].downloadedAt.toMillis() : 0;
+          const bt = b[0] && b[0].downloadedAt && b[0].downloadedAt.toMillis ? b[0].downloadedAt.toMillis() : 0;
+          return bt - at;
+        });
+
+        list.innerHTML = "";
+        const summaryLine = document.createElement("p");
+        summaryLine.className = "small";
+        summaryLine.textContent = `총 ${logs.length}건 / ${grouped.length}명`;
+        list.appendChild(summaryLine);
+
+        grouped.forEach(groupLogs => {
+          const details = document.createElement("details");
+          details.className = "item vertical";
+          details.open = !logsCollapsed;
+
+          const summary = document.createElement("summary");
+          summary.style.cursor = "pointer";
+          summary.style.listStyle = "none";
+          summary.innerHTML = `
+            <div class="item-head">
+              <b>${escapeHtml(logGroupTitle(groupLogs))}</b>
+              <span class="status">${groupLogs.length}건</span>
             </div>
           `;
-          list.appendChild(row);
+          details.appendChild(summary);
+
+          const controls = document.createElement("div");
+          controls.className = "actions left no-top";
+          controls.style.gap = "6px";
+          controls.style.flexWrap = "wrap";
+
+          const deleteGroupBtn = document.createElement("button");
+          deleteGroupBtn.className = "btn danger mini";
+          deleteGroupBtn.textContent = "이 사용자 기록 삭제";
+          deleteGroupBtn.addEventListener("click", async event => {
+            event.preventDefault();
+            event.stopPropagation();
+            if (!confirm(`${logGroupTitle(groupLogs)}\n\n이 사용자 다운로드 기록 ${groupLogs.length}건을 삭제할까요?`)) return;
+            await deleteLogsByIds(groupLogs.map(x => x.id), "사용자 다운로드 기록을 삭제했습니다.");
+          });
+          controls.appendChild(deleteGroupBtn);
+          details.appendChild(controls);
+
+          groupLogs.forEach(log => {
+            const row = document.createElement("div");
+            row.className = "item";
+            row.style.marginTop = "8px";
+            row.innerHTML = `
+              <div>
+                <b>${escapeHtml(log.name || "-")} / ${escapeHtml(log.department || "-")}</b>
+                <div class="meta">${escapeHtml(log.email || "-")} · ${escapeHtml(log.versionName || "-")} (${escapeHtml(log.versionCode || "-")})</div>
+                <div class="meta">${formatTime(log.downloadedAt)}</div>
+              </div>
+            `;
+
+            const deleteBtn = document.createElement("button");
+            deleteBtn.className = "btn danger mini";
+            deleteBtn.textContent = "삭제";
+            deleteBtn.addEventListener("click", async event => {
+              event.preventDefault();
+              event.stopPropagation();
+              if (!confirm("이 다운로드 기록 1건을 삭제할까요?")) return;
+              await deleteLogsByIds([log.id], "다운로드 기록 1건을 삭제했습니다.");
+            });
+            row.appendChild(deleteBtn);
+            details.appendChild(row);
+          });
+
+          list.appendChild(details);
         });
       } catch (e) {
         showError("logsList", e.message);
@@ -221,6 +361,22 @@
 
     $("refreshUsersBtn").addEventListener("click", loadUsers);
     $("refreshLogsBtn").addEventListener("click", loadLogs);
+    $("collapseLogsBtn").addEventListener("click", () => {
+      logsCollapsed = true;
+      document.querySelectorAll("#logsList details").forEach(item => item.open = false);
+    });
+    $("expandLogsBtn").addEventListener("click", () => {
+      logsCollapsed = false;
+      document.querySelectorAll("#logsList details").forEach(item => item.open = true);
+    });
+    $("deleteAllLogsBtn").addEventListener("click", async () => {
+      if (!currentLogs || currentLogs.length === 0) {
+        alert("삭제할 다운로드 기록이 없습니다.");
+        return;
+      }
+      if (!confirm(`다운로드 기록 전체 ${currentLogs.length}건을 삭제할까요?\n삭제하면 복구할 수 없습니다.`)) return;
+      await deleteLogsByIds(currentLogs.map(x => x.id), "다운로드 기록 전체를 삭제했습니다.");
+    });
     $("refreshRequestsBtn").addEventListener("click", loadRequests);
     $("logoutBtn").addEventListener("click", async () => {
       await signOut(auth);
