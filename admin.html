@@ -54,7 +54,6 @@
         <button class="btn secondary mini" id="expandLogsBtn">전체 펼치기</button>
         <button class="btn danger mini" id="deleteAllLogsBtn">전체 기록 삭제</button>
       </div>
-      <p class="small top-gap">이름/이메일별로 묶어서 표시합니다.</p>
       <div id="logsList" class="list"></div>
     </section>
 
@@ -69,7 +68,7 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
     import { getAuth, onAuthStateChanged, signOut, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
     import {
-      getFirestore, doc, getDoc, getDocs, collection, updateDoc,
+      getFirestore, doc, getDoc, getDocs, collection, setDoc, updateDoc,
       deleteDoc, writeBatch, serverTimestamp
     } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
     import { firebaseConfig, ADMIN_EMAIL } from "./firebase-config.js";
@@ -112,6 +111,19 @@
       if ((user.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase()) return true;
       const snap = await getDoc(doc(db, "users", user.uid));
       return snap.exists() && snap.data().role === "admin";
+    }
+
+    async function ensureAdminProfile(user) {
+      if (!user || (user.email || "").toLowerCase() !== ADMIN_EMAIL.toLowerCase()) return;
+      await user.getIdToken(true);
+      await setDoc(doc(db, "users", user.uid), {
+        uid: user.uid,
+        email: (user.email || ADMIN_EMAIL).toLowerCase(),
+        role: "admin",
+        approved: true,
+        blocked: false,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
     }
 
     function button(text, className, handler) {
@@ -172,7 +184,8 @@
         });
       } catch (error) {
         console.error(error);
-        $("usersList").innerHTML = '<p class="small">사용자 목록을 불러오지 못했습니다.</p>';
+        const denied = error?.code === "permission-denied";
+        $("usersList").innerHTML = `<p class="small">${denied ? "관리자 권한 규칙을 확인하지 못했습니다. Firestore Rules를 최종본으로 게시한 뒤 다시 눌러주세요." : "사용자 목록을 불러오지 못했습니다."}</p>`;
       }
     }
 
@@ -326,6 +339,7 @@
           $("adminStatus").textContent = "관리자 계정이 아닙니다.";
           return;
         }
+        await ensureAdminProfile(user);
         setAdminUi(true);
         $("adminStatus").textContent = `${user.email} 관리자 로그인 완료`;
         await Promise.all([loadUsers(), loadLogs(), loadRequests()]);
