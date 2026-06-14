@@ -94,10 +94,43 @@
     function stamp(value) {
       try {
         if (!value) return "시간 없음";
-        const date = value.toDate ? value.toDate() : new Date(value);
-        return new Intl.DateTimeFormat("ko-KR", { dateStyle:"medium", timeStyle:"short" }).format(date);
+        let date;
+        if (typeof value.toDate === "function") {
+          date = value.toDate();
+        } else if (typeof value.seconds === "number") {
+          date = new Date(value.seconds * 1000 + Math.floor((value.nanoseconds || 0) / 1000000));
+        } else if (typeof value === "number") {
+          date = new Date(value < 1000000000000 ? value * 1000 : value);
+        } else {
+          date = new Date(value);
+        }
+        if (Number.isNaN(date.getTime())) return "시간 없음";
+        return new Intl.DateTimeFormat("ko-KR", {
+          year:"numeric", month:"2-digit", day:"2-digit",
+          hour:"2-digit", minute:"2-digit", second:"2-digit",
+          hour12:true
+        }).format(date);
       } catch (_) {
         return "시간 없음";
+      }
+    }
+
+    function downloadTime(log) {
+      if (!log) return null;
+      return log.downloadedAt || log.createdAt || log.timestamp || log.time || log.updatedAt || null;
+    }
+
+    function timeMillis(value) {
+      try {
+        if (!value) return 0;
+        if (typeof value.toMillis === "function") return value.toMillis();
+        if (typeof value.toDate === "function") return value.toDate().getTime();
+        if (typeof value.seconds === "number") return value.seconds * 1000 + Math.floor((value.nanoseconds || 0) / 1000000);
+        if (typeof value === "number") return value < 1000000000000 ? value * 1000 : value;
+        const parsed = new Date(value).getTime();
+        return Number.isNaN(parsed) ? 0 : parsed;
+      } catch (_) {
+        return 0;
       }
     }
 
@@ -202,7 +235,7 @@
       try {
         const snap = await getDocs(collection(db, "downloadLogs"));
         const logs = snap.docs.map(d => ({ id:d.id, ref:d.ref, ...d.data() }));
-        logs.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+        logs.sort((a,b) => timeMillis(downloadTime(b)) - timeMillis(downloadTime(a)));
         const groups = new Map();
         logs.forEach(log => {
           const key = log.email || log.uid || log.name || "알 수 없음";
@@ -240,7 +273,7 @@
             const row = document.createElement("div");
             row.className = "item";
             const info = document.createElement("div");
-            info.innerHTML = `<b>${escapeHtml(log.fileName || log.versionName || "APK 다운로드")}</b><div class="meta">${stamp(log.createdAt)} · ${escapeHtml(log.department || "")}</div>`;
+            info.innerHTML = `<b>${escapeHtml(log.fileName || log.apkFile || log.versionName || "APK 다운로드")}</b><div class="meta">다운로드 시간: ${stamp(downloadTime(log))}${log.department ? ` · ${escapeHtml(log.department)}` : ""}</div>`;
             const del = button("삭제", "btn secondary mini", async () => {
               if (!confirm("이 기록을 삭제할까요?")) return;
               await deleteDoc(log.ref);
