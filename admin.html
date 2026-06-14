@@ -1,4 +1,5 @@
 <!doctype html>
+<!-- HWAITING ADMIN DOWNLOAD TIME FIX v113 -->
 <html lang="ko">
 <head>
   <meta charset="utf-8" />
@@ -97,8 +98,10 @@
         let date;
         if (typeof value.toDate === "function") {
           date = value.toDate();
-        } else if (typeof value.seconds === "number") {
-          date = new Date(value.seconds * 1000 + Math.floor((value.nanoseconds || 0) / 1000000));
+        } else if (typeof value.seconds === "number" || typeof value._seconds === "number") {
+          const seconds = typeof value.seconds === "number" ? value.seconds : value._seconds;
+          const nanos = typeof value.nanoseconds === "number" ? value.nanoseconds : (value._nanoseconds || 0);
+          date = new Date(seconds * 1000 + Math.floor(nanos / 1000000));
         } else if (typeof value === "number") {
           date = new Date(value < 1000000000000 ? value * 1000 : value);
         } else {
@@ -117,7 +120,8 @@
 
     function downloadTime(log) {
       if (!log) return null;
-      return log.downloadedAt || log.createdAt || log.timestamp || log.time || log.updatedAt || null;
+      return log.downloadedAt || log.createdAt || log.timestamp || log.time || log.updatedAt
+        || log.downloadedAtMs || log.clientTime || log.downloadTime || null;
     }
 
     function timeMillis(value) {
@@ -125,7 +129,11 @@
         if (!value) return 0;
         if (typeof value.toMillis === "function") return value.toMillis();
         if (typeof value.toDate === "function") return value.toDate().getTime();
-        if (typeof value.seconds === "number") return value.seconds * 1000 + Math.floor((value.nanoseconds || 0) / 1000000);
+        if (typeof value.seconds === "number" || typeof value._seconds === "number") {
+          const seconds = typeof value.seconds === "number" ? value.seconds : value._seconds;
+          const nanos = typeof value.nanoseconds === "number" ? value.nanoseconds : (value._nanoseconds || 0);
+          return seconds * 1000 + Math.floor(nanos / 1000000);
+        }
         if (typeof value === "number") return value < 1000000000000 ? value * 1000 : value;
         const parsed = new Date(value).getTime();
         return Number.isNaN(parsed) ? 0 : parsed;
