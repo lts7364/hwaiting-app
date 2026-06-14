@@ -5,13 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>화이팅 익명 요청함</title>
   <link rel="stylesheet" href="style.css" />
+  <style>
+    .public-badge { background:#fff0d7; color:#8a5a15; }
+    .request-result { min-height:24px; margin:8px 0 0; font-size:13px; line-height:1.5; }
+    .request-result.ok { color:var(--green); font-weight:900; }
+    .request-result.error { color:var(--danger); font-weight:900; }
+    .honeypot { position:absolute !important; left:-99999px !important; width:1px !important; height:1px !important; opacity:0 !important; pointer-events:none !important; }
+  </style>
 </head>
 <body>
-  <main class="page">
+  <main class="page narrow">
     <section class="hero small-hero">
-      <div class="badge">가입자 익명 요청함</div>
+      <div class="badge public-badge">로그인 없이 작성</div>
       <h1>요청함</h1>
-      <p class="subtitle">로그인한 사람만 작성할 수 있지만, 관리자 화면에는 작성자 정보가 표시되지 않습니다.</p>
+      <p class="subtitle">로그인하지 않아도 기능 요청이나 오류 내용을 익명으로 남길 수 있습니다.</p>
       <div class="text-links">
         <a href="index.html">홈</a>
         <a href="download.html">다운로드</a>
@@ -21,221 +28,89 @@
 
     <section class="card notice-card">
       <h2>안내</h2>
-      <p>기능 추가나 오류 내용을 편하게 남겨주세요.</p>
-      <p>처리 결과가 나온 요청은 본인이 삭제할 수 있습니다.</p>
+      <p>이름·부서·이메일은 수집하지 않습니다.</p>
+      <p>내용 확인이 가능하도록 오류 상황과 원하는 기능을 자세히 적어주세요.</p>
     </section>
 
-    <section class="card">
-      <h2>로그인 상태</h2>
-      <p id="userInfo" class="small">확인 중...</p>
-    </section>
-
-    <section class="card" id="requestFormCard" style="display:none;">
-      <h2>요청 작성</h2>
-      <div class="form">
-        <select id="category">
+    <section class="card" id="requestFormCard">
+      <h2>익명 요청 작성</h2>
+      <form class="form" id="requestForm">
+        <select id="category" required>
           <option value="기능 추가">기능 추가</option>
           <option value="오류 신고">오류 신고</option>
           <option value="사용법 질문">사용법 질문</option>
           <option value="기타">기타</option>
         </select>
-        <input id="title" placeholder="제목 예: 위젯 글씨 크게 해주세요" />
-        <textarea id="content" placeholder="내용을 편하게 적어주세요. 예: 어떤 화면에서, 어떤 상황에서, 어떻게 바꾸고 싶은지"></textarea>
-        <button class="btn primary full" id="submitBtn">익명 요청 등록</button>
-      </div>
-      <p class="small top-gap">관리자에게는 익명으로 보이고, 내 요청 목록에서는 상태를 확인할 수 있습니다.</p>
+        <input id="title" type="text" maxlength="80" placeholder="제목" required />
+        <textarea id="content" maxlength="2000" placeholder="내용을 자세히 입력해 주세요." required></textarea>
+        <input class="honeypot" id="website" name="website" type="text" tabindex="-1" autocomplete="off" aria-hidden="true" />
+        <button class="btn primary full" id="submitBtn" type="submit">익명 요청 등록</button>
+        <p class="request-result" id="resultMessage"></p>
+      </form>
     </section>
 
     <section class="card">
-      <h2>내 요청 상태</h2>
-      <div id="myRequests" class="list">
-        <p class="small">로그인 후 확인할 수 있습니다.</p>
-      </div>
+      <h2>처리 상태</h2>
+      <p class="small">로그인 없이 작성한 익명 요청은 작성자 확인 정보가 없으므로 이 화면에서 개별 처리 상태를 조회할 수 없습니다. 관리자가 요청 내용을 확인해 앱 업데이트에 반영합니다.</p>
     </section>
   </main>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
-    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
-    import {
-      getFirestore, doc, getDoc, addDoc, collection, serverTimestamp,
-      getDocs, query, where, deleteDoc
-    } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
+    import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
     import { firebaseConfig } from "./firebase-config.js";
 
     const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
     const db = getFirestore(app);
     const $ = id => document.getElementById(id);
-    let currentUser = null;
-    let currentProfile = null;
+    const LAST_SUBMIT_KEY = "hwaiting_public_request_last_submit";
 
-    function escapeHtml(value) {
-      return String(value || "")
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#039;");
+    function setResult(text, type = "") {
+      const el = $("resultMessage");
+      el.textContent = text || "";
+      el.className = "request-result" + (type ? ` ${type}` : "");
     }
 
-    function formatTime(value) {
-      if (!value) return "-";
-      try {
-        const d = value.toDate ? value.toDate() : new Date(value);
-        return d.toLocaleString("ko-KR");
-      } catch (e) {
-        return "-";
-      }
-    }
+    $("requestForm").addEventListener("submit", async event => {
+      event.preventDefault();
+      if ($("website").value) return;
 
-    function statusClass(status) {
-      if (status === "적용완료") return "status done";
-      if (status === "검토중") return "status progress";
-      if (status === "보류" || status === "거절") return "status hold";
-      return "status";
-    }
-
-    function canUserDeleteRequest(status) {
-      return status === "적용완료" || status === "보류" || status === "거절";
-    }
-
-    async function loadMyRequests() {
-      const box = $("myRequests");
-      if (!currentUser) {
-        box.innerHTML = "<p class='small'>로그인 후 내가 작성한 요청 상태를 확인할 수 있습니다.</p>";
-        return;
-      }
-
-      try {
-        const q = query(collection(db, "requests"), where("uid", "==", currentUser.uid));
-        const snap = await getDocs(q);
-        const rows = [];
-        snap.forEach(docSnap => rows.push({ id: docSnap.id, ...docSnap.data() }));
-        rows.sort((a, b) => {
-          const at = a.createdAt && a.createdAt.toMillis ? a.createdAt.toMillis() : 0;
-          const bt = b.createdAt && b.createdAt.toMillis ? b.createdAt.toMillis() : 0;
-          return bt - at;
-        });
-
-        if (rows.length === 0) {
-          box.innerHTML = "<p class='small'>아직 작성한 요청이 없습니다.</p>";
-          return;
-        }
-
-        box.innerHTML = "";
-        rows.forEach(req => {
-          const item = document.createElement("div");
-          item.className = "item vertical";
-          item.innerHTML = `
-            <div class="item-head">
-              <b>${escapeHtml(req.title || "-")}</b>
-              <span class="${statusClass(req.status || "접수")}">${escapeHtml(req.status || "접수")}</span>
-            </div>
-            <div class="meta">${escapeHtml(req.category || "-")} · ${formatTime(req.createdAt)}</div>
-            <div class="request-content">${escapeHtml(req.content || "")}</div>
-          `;
-
-          if (canUserDeleteRequest(req.status || "접수")) {
-            const actions = document.createElement("div");
-            actions.className = "actions left no-top";
-            const deleteBtn = document.createElement("button");
-            deleteBtn.className = "btn danger mini";
-            deleteBtn.textContent = "삭제";
-            deleteBtn.addEventListener("click", async () => {
-              if (!confirm("처리 결과가 나온 요청입니다. 이 요청을 삭제할까요? 삭제하면 다시 복구할 수 없습니다.")) return;
-              try {
-                await deleteDoc(doc(db, "requests", req.id));
-                await loadMyRequests();
-              } catch (e) {
-                alert("삭제 실패: " + e.message);
-              }
-            });
-            actions.appendChild(deleteBtn);
-            item.appendChild(actions);
-          }
-
-          box.appendChild(item);
-        });
-      } catch (e) {
-        box.innerHTML = "<p class='small'>내 요청을 불러오지 못했습니다: " + escapeHtml(e.message) + "</p>";
-      }
-    }
-
-    $("submitBtn").addEventListener("click", async () => {
-      if (!currentUser || !currentProfile) {
-        alert("로그인이 필요합니다.");
-        location.href = "login.html";
-        return;
-      }
-
-      if (currentProfile.blocked === true) {
-        alert("차단된 계정은 요청을 등록할 수 없습니다.");
+      const now = Date.now();
+      const previous = Number(localStorage.getItem(LAST_SUBMIT_KEY) || 0);
+      if (now - previous < 20000) {
+        setResult("연속 등록은 20초 후에 가능합니다.", "error");
         return;
       }
 
       const category = $("category").value;
       const title = $("title").value.trim();
       const content = $("content").value.trim();
-
-      if (!title || !content) {
-        alert("제목과 내용을 입력해주세요.");
+      if (title.length < 2 || content.length < 2) {
+        setResult("제목과 내용을 조금 더 자세히 입력해 주세요.", "error");
         return;
       }
 
+      $("submitBtn").disabled = true;
+      setResult("등록 중...");
       try {
-        $("submitBtn").disabled = true;
-        $("submitBtn").textContent = "등록 중...";
-
         await addDoc(collection(db, "requests"), {
           anonymous: true,
-          uid: currentUser.uid,
           category,
           title,
           content,
           status: "접수",
+          source: "public-web",
           createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-          source: "login-anonymous-request-page"
+          updatedAt: serverTimestamp()
         });
-
-        $("title").value = "";
-        $("content").value = "";
-        alert("익명 요청이 등록되었습니다.");
-        await loadMyRequests();
-      } catch (e) {
-        alert("요청 등록 실패: " + e.message);
+        localStorage.setItem(LAST_SUBMIT_KEY, String(Date.now()));
+        $("requestForm").reset();
+        setResult("익명 요청이 등록되었습니다.", "ok");
+      } catch (error) {
+        console.error(error);
+        setResult("등록하지 못했습니다. Firestore 규칙 적용 여부와 인터넷 연결을 확인해 주세요.", "error");
       } finally {
         $("submitBtn").disabled = false;
-        $("submitBtn").textContent = "익명 요청 등록";
-      }
-    });
-
-    onAuthStateChanged(auth, async user => {
-      currentUser = user;
-
-      if (!user) {
-        currentProfile = null;
-        $("userInfo").innerHTML = "로그인이 필요합니다. <a href='login.html'>로그인 / 회원가입</a>";
-        $("requestFormCard").style.display = "none";
-        await loadMyRequests();
-        return;
-      }
-
-      try {
-        const snap = await getDoc(doc(db, "users", user.uid));
-        currentProfile = snap.exists() ? snap.data() : {};
-        if (currentProfile.blocked === true) {
-          $("userInfo").textContent = "로그인됨 / 차단된 계정입니다. 요청을 작성할 수 없습니다.";
-          $("requestFormCard").style.display = "none";
-        } else {
-          $("userInfo").textContent = "로그인됨 / 익명 요청 작성 가능";
-          $("requestFormCard").style.display = "block";
-        }
-        await loadMyRequests();
-      } catch (e) {
-        $("userInfo").textContent = "사용자 정보를 불러오지 못했습니다: " + e.message;
-        $("requestFormCard").style.display = "none";
       }
     });
   </script>

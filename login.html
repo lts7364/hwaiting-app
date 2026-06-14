@@ -5,6 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>화이팅 로그인</title>
   <link rel="stylesheet" href="style.css" />
+  <style>
+    .reset-note { margin-top:10px; padding:11px 12px; border-radius:14px; background:#f4f8ef; color:#4f614f; font-size:13px; line-height:1.55; }
+    .form-message { min-height:22px; margin:2px 0 0; font-size:13px; line-height:1.5; color:var(--muted); }
+    .form-message.ok { color:var(--green); font-weight:800; }
+    .form-message.error { color:var(--danger); font-weight:800; }
+  </style>
 </head>
 <body>
   <main class="page narrow">
@@ -30,40 +36,60 @@
 
     <section class="card hidden" id="loginCard">
       <h2>로그인</h2>
-      <div class="form">
-        <input id="loginEmail" type="email" placeholder="이메일" autocomplete="email" />
-        <input id="loginPassword" type="password" placeholder="비밀번호" autocomplete="current-password" />
-        <button class="btn primary full" id="loginBtn">로그인</button>
+      <form class="form" id="loginForm">
+        <input id="loginEmail" type="email" autocomplete="email" placeholder="이메일" required />
+        <input id="loginPassword" type="password" autocomplete="current-password" placeholder="비밀번호" minlength="6" required />
+        <button class="btn primary full" type="submit" id="loginBtn">로그인</button>
+        <p class="form-message" id="loginMessage"></p>
+      </form>
+      <div class="text-links">
+        <button id="showReset" type="button">비밀번호를 잊으셨나요?</button>
+        <button id="loginToSignup" type="button">처음 이용해요</button>
+        <a href="index.html">홈으로</a>
+      </div>
+    </section>
+
+    <section class="card hidden" id="resetCard">
+      <h2>비밀번호 찾기</h2>
+      <p class="small">가입할 때 사용한 이메일을 입력하면 비밀번호 재설정 메일을 보내드립니다.</p>
+      <form class="form top-gap" id="resetForm">
+        <input id="resetEmail" type="email" autocomplete="email" placeholder="가입한 이메일" required />
+        <button class="btn primary full" type="submit" id="resetBtn">재설정 메일 보내기</button>
+        <p class="form-message" id="resetMessage"></p>
+      </form>
+      <div class="reset-note">
+        메일이 보이지 않으면 스팸함도 확인해 주세요. 보안을 위해 가입 여부와 관계없이 같은 안내가 표시될 수 있습니다.
       </div>
       <div class="text-links">
-        <button id="toSignup" type="button">처음 이용해요</button>
+        <button id="resetToLogin" type="button">로그인으로 돌아가기</button>
         <a href="index.html">홈으로</a>
       </div>
     </section>
 
     <section class="card hidden" id="signupCard">
       <h2>회원가입</h2>
-      <div class="form">
-        <input id="signupName" placeholder="이름" autocomplete="name" />
-        <input id="signupDepartment" placeholder="부서" autocomplete="organization" />
-        <input id="signupEmail" type="email" placeholder="이메일" autocomplete="email" />
-        <input id="signupPassword" type="password" placeholder="비밀번호" autocomplete="new-password" />
-        <input id="signupPassword2" type="password" placeholder="비밀번호 확인" autocomplete="new-password" />
-        <button class="btn primary full" id="signupBtn">회원가입</button>
-      </div>
+      <form class="form" id="signupForm">
+        <input id="signupName" type="text" maxlength="30" placeholder="이름" required />
+        <input id="signupDepartment" type="text" maxlength="40" placeholder="부서" required />
+        <input id="signupEmail" type="email" autocomplete="email" placeholder="이메일" required />
+        <input id="signupPassword" type="password" autocomplete="new-password" placeholder="비밀번호 6자 이상" minlength="6" required />
+        <input id="signupPassword2" type="password" autocomplete="new-password" placeholder="비밀번호 확인" minlength="6" required />
+        <button class="btn primary full" type="submit" id="signupBtn">회원가입</button>
+        <p class="form-message" id="signupMessage"></p>
+      </form>
       <div class="text-links">
-        <button id="toLogin" type="button">이미 가입했어요</button>
+        <button id="signupToLogin" type="button">이미 가입했어요</button>
         <a href="index.html">홈으로</a>
       </div>
     </section>
 
-    <section class="card done-card hidden" id="loggedInCard">
+    <section class="card done-card hidden" id="doneCard">
       <h2>로그인 완료</h2>
-      <p id="status" class="small">확인 중...</p>
+      <p id="doneStatus" class="small">확인 중...</p>
       <div class="actions">
         <a class="btn primary" href="download.html">다운로드로 이동</a>
         <a class="btn secondary" href="request.html">요청함</a>
-        <button class="btn danger" id="logoutBtn">로그아웃</button>
+        <button class="btn danger" id="logoutBtn" type="button">로그아웃</button>
       </div>
     </section>
   </main>
@@ -71,120 +97,151 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
     import {
-      getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
-      signOut, onAuthStateChanged, updateProfile
+      getAuth, onAuthStateChanged, signInWithEmailAndPassword,
+      createUserWithEmailAndPassword, sendPasswordResetEmail, signOut
     } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
     import {
-      getFirestore, doc, setDoc, getDoc, serverTimestamp
+      getFirestore, doc, getDoc, setDoc, serverTimestamp
     } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
     import { firebaseConfig, ADMIN_EMAIL } from "./firebase-config.js";
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
+    auth.languageCode = "ko";
+
     const $ = id => document.getElementById(id);
+    const cards = ["modeCard", "loginCard", "resetCard", "signupCard", "doneCard"];
 
-    function showMode(mode) {
-      $("modeCard").classList.add("hidden");
-      $("loginCard").classList.toggle("hidden", mode !== "login");
-      $("signupCard").classList.toggle("hidden", mode !== "signup");
-      $("loggedInCard").classList.add("hidden");
+    function showCard(id) {
+      cards.forEach(cardId => $(cardId).classList.toggle("hidden", cardId !== id));
+      window.scrollTo({ top: 0, behavior: "smooth" });
     }
 
-    $("showLogin").addEventListener("click", () => showMode("login"));
-    $("showSignup").addEventListener("click", () => showMode("signup"));
-    $("toSignup").addEventListener("click", () => showMode("signup"));
-    $("toLogin").addEventListener("click", () => showMode("login"));
-
-    async function createUserProfile(user, name, department) {
-      const role = user.email === ADMIN_EMAIL ? "admin" : "user";
-      await setDoc(doc(db, "users", user.uid), {
-        uid: user.uid,
-        email: user.email,
-        name: name || "",
-        department: department || "",
-        approved: true,
-        blocked: false,
-        role,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      }, { merge: true });
+    function setMessage(id, text, type = "") {
+      const el = $(id);
+      el.textContent = text || "";
+      el.className = "form-message" + (type ? ` ${type}` : "");
     }
 
-    $("signupBtn").addEventListener("click", async () => {
-      const name = $("signupName").value.trim();
-      const department = $("signupDepartment").value.trim();
-      const email = $("signupEmail").value.trim();
-      const password = $("signupPassword").value;
-      const password2 = $("signupPassword2").value;
+    function cleanEmail(value) {
+      return String(value || "").trim().toLowerCase();
+    }
 
-      if (!name || !department || !email || !password) {
-        alert("이름, 부서, 이메일, 비밀번호를 모두 입력해주세요.");
-        return;
-      }
-      if (password !== password2) {
-        alert("비밀번호 확인이 다릅니다.");
-        return;
-      }
+    function friendlyError(error) {
+      const code = error?.code || "";
+      if (code.includes("invalid-credential") || code.includes("wrong-password") || code.includes("user-not-found")) return "이메일 또는 비밀번호를 확인해 주세요.";
+      if (code.includes("email-already-in-use")) return "이미 가입된 이메일입니다. 로그인하거나 비밀번호 찾기를 이용해 주세요.";
+      if (code.includes("invalid-email")) return "이메일 형식을 확인해 주세요.";
+      if (code.includes("weak-password")) return "비밀번호는 6자 이상 입력해 주세요.";
+      if (code.includes("too-many-requests")) return "요청이 너무 많습니다. 잠시 뒤 다시 시도해 주세요.";
+      if (code.includes("network-request-failed")) return "인터넷 연결을 확인해 주세요.";
+      return "처리 중 문제가 발생했습니다. 잠시 뒤 다시 시도해 주세요.";
+    }
 
+    async function loadProfile(user) {
+      const snap = await getDoc(doc(db, "users", user.uid));
+      return snap.exists() ? snap.data() : null;
+    }
+
+    $("showLogin").onclick = () => showCard("loginCard");
+    $("showSignup").onclick = () => showCard("signupCard");
+    $("loginToSignup").onclick = () => showCard("signupCard");
+    $("signupToLogin").onclick = () => showCard("loginCard");
+    $("showReset").onclick = () => {
+      $("resetEmail").value = $("loginEmail").value.trim();
+      showCard("resetCard");
+    };
+    $("resetToLogin").onclick = () => showCard("loginCard");
+
+    $("loginForm").addEventListener("submit", async event => {
+      event.preventDefault();
+      setMessage("loginMessage", "로그인 중...");
+      $("loginBtn").disabled = true;
       try {
-        $("signupBtn").disabled = true;
-        $("signupBtn").textContent = "가입 중...";
-        const cred = await createUserWithEmailAndPassword(auth, email, password);
-        await updateProfile(cred.user, { displayName: name });
-        await createUserProfile(cred.user, name, department);
-        location.href = "download.html";
-      } catch (e) {
-        alert("회원가입 실패: " + e.message);
-      } finally {
-        $("signupBtn").disabled = false;
-        $("signupBtn").textContent = "회원가입";
-      }
-    });
-
-    $("loginBtn").addEventListener("click", async () => {
-      const email = $("loginEmail").value.trim();
-      const password = $("loginPassword").value;
-      if (!email || !password) {
-        alert("이메일과 비밀번호를 입력해주세요.");
-        return;
-      }
-      try {
-        $("loginBtn").disabled = true;
-        $("loginBtn").textContent = "로그인 중...";
-        const cred = await signInWithEmailAndPassword(auth, email, password);
-        const snap = await getDoc(doc(db, "users", cred.user.uid));
-        if (!snap.exists()) {
-          const name = cred.user.displayName || email.split("@")[0];
-          await createUserProfile(cred.user, name, "");
-        }
-        location.href = "download.html";
-      } catch (e) {
-        alert("로그인 실패: " + e.message);
+        const email = cleanEmail($("loginEmail").value);
+        await signInWithEmailAndPassword(auth, email, $("loginPassword").value);
+      } catch (error) {
+        setMessage("loginMessage", friendlyError(error), "error");
       } finally {
         $("loginBtn").disabled = false;
-        $("loginBtn").textContent = "로그인";
       }
     });
 
-    $("logoutBtn").addEventListener("click", async () => {
-      await signOut(auth);
-      location.reload();
+    $("signupForm").addEventListener("submit", async event => {
+      event.preventDefault();
+      setMessage("signupMessage", "가입 처리 중...");
+      const name = $("signupName").value.trim();
+      const department = $("signupDepartment").value.trim();
+      const email = cleanEmail($("signupEmail").value);
+      const password = $("signupPassword").value;
+      const password2 = $("signupPassword2").value;
+      if (password !== password2) {
+        setMessage("signupMessage", "비밀번호 확인이 일치하지 않습니다.", "error");
+        return;
+      }
+      $("signupBtn").disabled = true;
+      try {
+        const result = await createUserWithEmailAndPassword(auth, email, password);
+        await setDoc(doc(db, "users", result.user.uid), {
+          uid: result.user.uid,
+          name,
+          department,
+          email,
+          approved: true,
+          blocked: false,
+          role: email === ADMIN_EMAIL.toLowerCase() ? "admin" : "user",
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+      } catch (error) {
+        setMessage("signupMessage", friendlyError(error), "error");
+      } finally {
+        $("signupBtn").disabled = false;
+      }
     });
 
-    onAuthStateChanged(auth, async user => {
-      if (!user) return;
-      $("modeCard").classList.add("hidden");
-      $("loginCard").classList.add("hidden");
-      $("signupCard").classList.add("hidden");
-      $("loggedInCard").classList.remove("hidden");
-
+    $("resetForm").addEventListener("submit", async event => {
+      event.preventDefault();
+      const email = cleanEmail($("resetEmail").value);
+      setMessage("resetMessage", "메일을 보내는 중...");
+      $("resetBtn").disabled = true;
       try {
-        const snap = await getDoc(doc(db, "users", user.uid));
-        const data = snap.exists() ? snap.data() : {};
-        $("status").textContent = `${data.name || user.email}님, 로그인되어 있습니다.`;
-      } catch (e) {
-        $("status").textContent = `${user.email} 로그인됨`;
+        await sendPasswordResetEmail(auth, email);
+        setMessage("resetMessage", "가입된 계정이라면 비밀번호 재설정 메일이 발송되었습니다.", "ok");
+      } catch (error) {
+        if (error?.code === "auth/invalid-email") {
+          setMessage("resetMessage", "이메일 형식을 확인해 주세요.", "error");
+        } else if (error?.code === "auth/too-many-requests") {
+          setMessage("resetMessage", "요청이 너무 많습니다. 잠시 뒤 다시 시도해 주세요.", "error");
+        } else {
+          setMessage("resetMessage", "가입된 계정이라면 비밀번호 재설정 메일이 발송되었습니다.", "ok");
+        }
+      } finally {
+        $("resetBtn").disabled = false;
+      }
+    });
+
+    $("logoutBtn").onclick = () => signOut(auth);
+
+    onAuthStateChanged(auth, async user => {
+      if (!user) {
+        if (!cards.some(id => !$(id).classList.contains("hidden") && id !== "doneCard")) showCard("modeCard");
+        return;
+      }
+      try {
+        const profile = await loadProfile(user);
+        if (profile?.blocked === true) {
+          await signOut(auth);
+          showCard("loginCard");
+          setMessage("loginMessage", "차단된 계정입니다. 관리자에게 문의해 주세요.", "error");
+          return;
+        }
+        $("doneStatus").textContent = `${profile?.name || user.email || "사용자"}님으로 로그인했습니다.`;
+        showCard("doneCard");
+      } catch (error) {
+        $("doneStatus").textContent = user.email || "로그인 완료";
+        showCard("doneCard");
       }
     });
   </script>

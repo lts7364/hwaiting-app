@@ -5,6 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>화이팅 관리자</title>
   <link rel="stylesheet" href="style.css" />
+  <style>
+    .admin-grid { display:grid; gap:10px; }
+    .user-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:10px; align-items:center; }
+    .user-actions { display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; }
+    .email-line { overflow-wrap:anywhere; }
+    .log-group { border:1px solid #e1d3bf; border-radius:16px; background:#f4ead9; overflow:hidden; }
+    .log-group summary { padding:12px; cursor:pointer; font-weight:900; }
+    .log-body { padding:0 12px 12px; display:grid; gap:8px; }
+    .inline-select { width:auto; min-width:120px; min-height:36px; padding:7px 10px; }
+    @media (max-width:620px) {
+      .user-row { grid-template-columns:1fr; }
+      .user-actions { justify-content:flex-start; }
+    }
+  </style>
 </head>
 <body>
   <main class="page">
@@ -26,8 +40,10 @@
 
     <section class="card" id="usersCard" style="display:none;">
       <h2>사용자 목록</h2>
-      <button class="btn secondary" id="refreshUsersBtn">사용자 새로고침</button>
-      <div id="usersList" class="list"></div>
+      <div class="actions left no-top">
+        <button class="btn secondary mini" id="refreshUsersBtn">사용자 새로고침</button>
+      </div>
+      <div id="usersList" class="list admin-grid"></div>
     </section>
 
     <section class="card" id="logsCard" style="display:none;">
@@ -38,7 +54,7 @@
         <button class="btn secondary mini" id="expandLogsBtn">전체 펼치기</button>
         <button class="btn danger mini" id="deleteAllLogsBtn">전체 기록 삭제</button>
       </div>
-      <p class="small">이름/이메일별로 묶어서 표시합니다. 삭제 기능을 쓰려면 Firestore Rules도 같이 교체해야 합니다.</p>
+      <p class="small top-gap">이름/이메일별로 묶어서 표시합니다.</p>
       <div id="logsList" class="list"></div>
     </section>
 
@@ -53,17 +69,22 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
     import { getAuth, onAuthStateChanged, signOut, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
     import {
-      getFirestore, doc, getDoc, getDocs, collection, updateDoc, deleteDoc, writeBatch, serverTimestamp
+      getFirestore, doc, getDoc, getDocs, collection, updateDoc,
+      deleteDoc, writeBatch, serverTimestamp
     } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
     import { firebaseConfig, ADMIN_EMAIL } from "./firebase-config.js";
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
+    auth.languageCode = "ko";
+
     const $ = id => document.getElementById(id);
+    let currentAdmin = null;
+    let logDetails = [];
 
     function escapeHtml(value) {
-      return String(value || "")
+      return String(value ?? "")
         .replaceAll("&", "&amp;")
         .replaceAll("<", "&lt;")
         .replaceAll(">", "&gt;")
@@ -71,345 +92,248 @@
         .replaceAll("'", "&#039;");
     }
 
-    function formatTime(value) {
-      if (!value) return "-";
+    function stamp(value) {
       try {
-        const d = value.toDate ? value.toDate() : new Date(value);
-        return d.toLocaleString("ko-KR");
-      } catch (e) {
-        return "-";
+        if (!value) return "시간 없음";
+        const date = value.toDate ? value.toDate() : new Date(value);
+        return new Intl.DateTimeFormat("ko-KR", { dateStyle:"medium", timeStyle:"short" }).format(date);
+      } catch (_) {
+        return "시간 없음";
       }
     }
 
-    function showError(targetId, message) {
-      $(targetId).innerHTML = `<p class="small">불러오기 실패: ${escapeHtml(message)}</p>`;
+    function setAdminUi(enabled) {
+      ["usersCard", "logsCard", "requestsCard"].forEach(id => $(id).style.display = enabled ? "block" : "none");
+      $("logoutBtn").style.display = enabled ? "inline-flex" : "none";
     }
 
-    async function sendResetMailToUser(user) {
-      const email = (user && user.email ? String(user.email) : "").trim();
-      if (!email) {
-        alert("이 사용자의 이메일이 없어 비밀번호 초기화를 보낼 수 없습니다.");
-        return;
-      }
-      if (!confirm(`${email}\n\n이 이메일로 비밀번호 재설정 메일을 보낼까요?`)) return;
-      try {
-        await sendPasswordResetEmail(auth, email);
-        alert("비밀번호 재설정 메일을 보냈습니다.\n사용자가 메일에서 새 비밀번호를 설정하면 됩니다.");
-      } catch (e) {
-        alert("비밀번호 초기화 메일 전송 실패: " + (e.message || e));
-      }
+    async function isAdmin(user) {
+      if (!user) return false;
+      if ((user.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase()) return true;
+      const snap = await getDoc(doc(db, "users", user.uid));
+      return snap.exists() && snap.data().role === "admin";
+    }
+
+    function button(text, className, handler) {
+      const el = document.createElement("button");
+      el.type = "button";
+      el.className = className;
+      el.textContent = text;
+      el.onclick = handler;
+      return el;
     }
 
     async function loadUsers() {
-      const list = $("usersList");
-      list.innerHTML = "<p class='small'>불러오는 중...</p>";
+      $("usersList").innerHTML = '<p class="small">불러오는 중...</p>';
       try {
         const snap = await getDocs(collection(db, "users"));
-        const users = [];
-        snap.forEach(docSnap => users.push({ id: docSnap.id, ...docSnap.data() }));
-        users.sort((a, b) => (a.email || "").localeCompare(b.email || ""));
-        if (users.length === 0) {
-          list.innerHTML = "<p class='small'>사용자가 없습니다.</p>";
+        const users = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+        users.sort((a,b) => String(a.name || a.email || "").localeCompare(String(b.name || b.email || ""), "ko"));
+        $("usersList").innerHTML = "";
+        if (!users.length) {
+          $("usersList").innerHTML = '<p class="small">등록된 사용자가 없습니다.</p>';
           return;
         }
-        list.innerHTML = "";
+
         users.forEach(user => {
-          const row = document.createElement("div");
-          row.className = "item";
-          const blocked = user.blocked === true;
-          row.innerHTML = `
-            <div>
-              <b>${escapeHtml(user.name || "-")}</b>
-              <div class="meta">${escapeHtml(user.department || "-")} · ${escapeHtml(user.email || "-")} · ${escapeHtml(user.role || "user")}</div>
-              <div class="meta">${blocked ? "차단됨" : "사용 가능"}</div>
-            </div>
+          const item = document.createElement("div");
+          item.className = "item user-row";
+          const info = document.createElement("div");
+          info.innerHTML = `
+            <div><b>${escapeHtml(user.name || "이름 없음")}</b> <span class="status">${escapeHtml(user.department || "부서 없음")}</span></div>
+            <div class="meta email-line">${escapeHtml(user.email || "이메일 없음")}</div>
+            <div class="meta">UID: ${escapeHtml(user.id)} · ${user.blocked === true ? "차단됨" : "정상"} · ${escapeHtml(user.role || "user")}</div>
           `;
 
-          const controls = document.createElement("div");
-          controls.className = "actions left no-top";
-          controls.style.gap = "6px";
-          controls.style.flexWrap = "wrap";
-          controls.style.justifyContent = "flex-end";
+          const actions = document.createElement("div");
+          actions.className = "user-actions";
+          actions.appendChild(button(user.blocked === true ? "차단 해제" : "차단", "btn secondary mini", async () => {
+            try {
+              await updateDoc(doc(db, "users", user.id), { blocked: user.blocked !== true, updatedAt:serverTimestamp() });
+              await loadUsers();
+            } catch (error) {
+              alert("차단 상태를 변경하지 못했습니다.");
+            }
+          }));
 
-          const resetBtn = document.createElement("button");
-          resetBtn.className = "btn secondary mini";
-          resetBtn.textContent = "비번초기화";
-          resetBtn.addEventListener("click", () => sendResetMailToUser(user));
-          controls.appendChild(resetBtn);
+          actions.appendChild(button("비밀번호 메일", "btn secondary mini", async () => {
+            if (!user.email) return alert("이메일 정보가 없습니다.");
+            if (!confirm(`${user.email} 주소로 비밀번호 재설정 메일을 보낼까요?`)) return;
+            try {
+              await sendPasswordResetEmail(auth, user.email);
+              alert("비밀번호 재설정 메일을 보냈습니다.");
+            } catch (error) {
+              alert("메일을 보내지 못했습니다. Firebase Authentication 설정을 확인해 주세요.");
+            }
+          }));
 
-          const blockBtn = document.createElement("button");
-          blockBtn.className = blocked ? "btn secondary mini" : "btn danger mini";
-          blockBtn.textContent = blocked ? "차단해제" : "차단";
-          blockBtn.addEventListener("click", async () => {
-            await updateDoc(doc(db, "users", user.id), { blocked: !blocked, updatedAt: serverTimestamp() });
-            await loadUsers();
-          });
-          controls.appendChild(blockBtn);
-
-          row.appendChild(controls);
-          list.appendChild(row);
+          item.append(info, actions);
+          $("usersList").appendChild(item);
         });
-      } catch (e) {
-        showError("usersList", e.message);
+      } catch (error) {
+        console.error(error);
+        $("usersList").innerHTML = '<p class="small">사용자 목록을 불러오지 못했습니다.</p>';
       }
     }
 
-    let currentLogs = [];
-    let logsCollapsed = true;
-
-    function logGroupKey(log) {
-      const email = (log.email || "").trim();
-      if (email) return email.toLowerCase();
-      return `${log.name || "-"}|${log.department || "-"}`;
-    }
-
-    function logGroupTitle(logs) {
-      const first = logs[0] || {};
-      const name = first.name || "-";
-      const dept = first.department || "-";
-      const email = first.email || "-";
-      const latest = logs[0] ? formatTime(logs[0].downloadedAt) : "-";
-      return `${name} / ${dept} · ${email} · ${logs.length}건 · 최근 ${latest}`;
-    }
-
-    async function deleteLogsByIds(ids, afterDone) {
-      if (!ids || ids.length === 0) return;
-      try {
-        // Firestore batch는 500개 제한이 있어 안전하게 450개씩 나눠 삭제합니다.
-        for (let i = 0; i < ids.length; i += 450) {
-          const batch = writeBatch(db);
-          ids.slice(i, i + 450).forEach(id => {
-            batch.delete(doc(db, "downloadLogs", id));
-          });
-          await batch.commit();
-        }
-        if (afterDone) alert(afterDone);
-        await loadLogs();
-      } catch (e) {
-        alert("삭제 실패: " + (e.message || e));
+    async function deleteDocsInBatches(docs) {
+      for (let start = 0; start < docs.length; start += 400) {
+        const batch = writeBatch(db);
+        docs.slice(start, start + 400).forEach(item => batch.delete(item.ref));
+        await batch.commit();
       }
     }
 
     async function loadLogs() {
-      const list = $("logsList");
-      list.innerHTML = "<p class='small'>불러오는 중...</p>";
+      $("logsList").innerHTML = '<p class="small">불러오는 중...</p>';
       try {
         const snap = await getDocs(collection(db, "downloadLogs"));
-        const logs = [];
-        snap.forEach(docSnap => logs.push({ id: docSnap.id, ...docSnap.data() }));
-        logs.sort((a, b) => {
-          const at = a.downloadedAt && a.downloadedAt.toMillis ? a.downloadedAt.toMillis() : 0;
-          const bt = b.downloadedAt && b.downloadedAt.toMillis ? b.downloadedAt.toMillis() : 0;
-          return bt - at;
-        });
-        currentLogs = logs;
-        if (logs.length === 0) {
-          list.innerHTML = "<p class='small'>다운로드 기록이 없습니다.</p>";
-          return;
-        }
-
+        const logs = snap.docs.map(d => ({ id:d.id, ref:d.ref, ...d.data() }));
+        logs.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
         const groups = new Map();
         logs.forEach(log => {
-          const key = logGroupKey(log);
+          const key = log.email || log.uid || log.name || "알 수 없음";
           if (!groups.has(key)) groups.set(key, []);
           groups.get(key).push(log);
         });
+        $("logsList").innerHTML = "";
+        logDetails = [];
+        if (!logs.length) {
+          $("logsList").innerHTML = '<p class="small">다운로드 기록이 없습니다.</p>';
+          return;
+        }
 
-        const grouped = Array.from(groups.values()).sort((a, b) => {
-          const at = a[0] && a[0].downloadedAt && a[0].downloadedAt.toMillis ? a[0].downloadedAt.toMillis() : 0;
-          const bt = b[0] && b[0].downloadedAt && b[0].downloadedAt.toMillis ? b[0].downloadedAt.toMillis() : 0;
-          return bt - at;
-        });
-
-        list.innerHTML = "";
-        const summaryLine = document.createElement("p");
-        summaryLine.className = "small";
-        summaryLine.textContent = `총 ${logs.length}건 / ${grouped.length}명`;
-        list.appendChild(summaryLine);
-
-        grouped.forEach(groupLogs => {
-          const details = document.createElement("details");
-          details.className = "item vertical";
-          details.open = !logsCollapsed;
-
+        groups.forEach((items, key) => {
+          const detail = document.createElement("details");
+          detail.className = "log-group";
+          detail.open = false;
+          logDetails.push(detail);
           const summary = document.createElement("summary");
-          summary.style.cursor = "pointer";
-          summary.style.listStyle = "none";
-          summary.innerHTML = `
-            <div class="item-head">
-              <b>${escapeHtml(logGroupTitle(groupLogs))}</b>
-              <span class="status">${groupLogs.length}건</span>
-            </div>
-          `;
-          details.appendChild(summary);
+          const first = items[0];
+          summary.textContent = `${first.name || "이름 없음"} · ${first.email || key} · ${items.length}건`;
+          detail.appendChild(summary);
+          const body = document.createElement("div");
+          body.className = "log-body";
 
-          const controls = document.createElement("div");
-          controls.className = "actions left no-top";
-          controls.style.gap = "6px";
-          controls.style.flexWrap = "wrap";
-
-          const deleteGroupBtn = document.createElement("button");
-          deleteGroupBtn.className = "btn danger mini";
-          deleteGroupBtn.textContent = "이 사용자 기록 삭제";
-          deleteGroupBtn.addEventListener("click", async event => {
+          const deleteGroup = button("이 사용자의 기록 삭제", "btn danger mini", async event => {
             event.preventDefault();
-            event.stopPropagation();
-            if (!confirm(`${logGroupTitle(groupLogs)}\n\n이 사용자 다운로드 기록 ${groupLogs.length}건을 삭제할까요?`)) return;
-            await deleteLogsByIds(groupLogs.map(x => x.id), "사용자 다운로드 기록을 삭제했습니다.");
+            if (!confirm(`${first.name || first.email || key}의 다운로드 기록 ${items.length}건을 삭제할까요?`)) return;
+            await deleteDocsInBatches(items);
+            await loadLogs();
           });
-          controls.appendChild(deleteGroupBtn);
-          details.appendChild(controls);
+          body.appendChild(deleteGroup);
 
-          groupLogs.forEach(log => {
+          items.forEach(log => {
             const row = document.createElement("div");
             row.className = "item";
-            row.style.marginTop = "8px";
-            row.innerHTML = `
-              <div>
-                <b>${escapeHtml(log.name || "-")} / ${escapeHtml(log.department || "-")}</b>
-                <div class="meta">${escapeHtml(log.email || "-")} · ${escapeHtml(log.versionName || "-")} (${escapeHtml(log.versionCode || "-")})</div>
-                <div class="meta">${formatTime(log.downloadedAt)}</div>
-              </div>
-            `;
-
-            const deleteBtn = document.createElement("button");
-            deleteBtn.className = "btn danger mini";
-            deleteBtn.textContent = "삭제";
-            deleteBtn.addEventListener("click", async event => {
-              event.preventDefault();
-              event.stopPropagation();
-              if (!confirm("이 다운로드 기록 1건을 삭제할까요?")) return;
-              await deleteLogsByIds([log.id], "다운로드 기록 1건을 삭제했습니다.");
+            const info = document.createElement("div");
+            info.innerHTML = `<b>${escapeHtml(log.fileName || log.versionName || "APK 다운로드")}</b><div class="meta">${stamp(log.createdAt)} · ${escapeHtml(log.department || "")}</div>`;
+            const del = button("삭제", "btn secondary mini", async () => {
+              if (!confirm("이 기록을 삭제할까요?")) return;
+              await deleteDoc(log.ref);
+              await loadLogs();
             });
-            row.appendChild(deleteBtn);
-            details.appendChild(row);
+            row.append(info, del);
+            body.appendChild(row);
           });
-
-          list.appendChild(details);
+          detail.appendChild(body);
+          $("logsList").appendChild(detail);
         });
-      } catch (e) {
-        showError("logsList", e.message);
+      } catch (error) {
+        console.error(error);
+        $("logsList").innerHTML = '<p class="small">다운로드 기록을 불러오지 못했습니다.</p>';
       }
     }
 
     async function loadRequests() {
-      const list = $("requestsList");
-      list.innerHTML = "<p class='small'>불러오는 중...</p>";
+      $("requestsList").innerHTML = '<p class="small">불러오는 중...</p>';
       try {
         const snap = await getDocs(collection(db, "requests"));
-        const requests = [];
-        snap.forEach(docSnap => requests.push({ id: docSnap.id, ...docSnap.data() }));
-        requests.sort((a, b) => {
-          const at = a.createdAt && a.createdAt.toMillis ? a.createdAt.toMillis() : 0;
-          const bt = b.createdAt && b.createdAt.toMillis ? b.createdAt.toMillis() : 0;
-          return bt - at;
-        });
-        if (requests.length === 0) {
-          list.innerHTML = "<p class='small'>등록된 요청이 없습니다.</p>";
+        const requests = snap.docs.map(d => ({ id:d.id, ref:d.ref, ...d.data() }));
+        requests.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+        $("requestsList").innerHTML = "";
+        if (!requests.length) {
+          $("requestsList").innerHTML = '<p class="small">등록된 요청이 없습니다.</p>';
           return;
         }
         const statuses = ["접수", "검토중", "적용완료", "보류", "거절"];
-        list.innerHTML = "";
-        requests.forEach(req => {
-          const row = document.createElement("div");
-          row.className = "item vertical";
-          row.innerHTML = `
-            <div class="item-head">
-              <b>${escapeHtml(req.title || "-")}</b>
-              <span class="status">${escapeHtml(req.status || "접수")}</span>
-            </div>
-            <div class="meta">${escapeHtml(req.category || "-")} · 익명 요청 · ${formatTime(req.createdAt)}</div>
-            <div class="request-content">${escapeHtml(req.content || "")}</div>
-          `;
-          const control = document.createElement("div");
-          control.className = "actions left no-top";
-          statuses.forEach(status => {
-            const btn = document.createElement("button");
-            btn.className = status === (req.status || "접수") ? "btn primary mini" : "btn secondary mini";
-            btn.textContent = status;
-            btn.addEventListener("click", async () => {
-              await updateDoc(doc(db, "requests", req.id), {
-                status,
-                updatedAt: serverTimestamp()
-              });
-              await loadRequests();
-            });
-            control.appendChild(btn);
+        requests.forEach(request => {
+          const item = document.createElement("div");
+          item.className = "item vertical";
+          const head = document.createElement("div");
+          head.className = "item-head";
+          head.innerHTML = `<div><b>${escapeHtml(request.title || "제목 없음")}</b><div class="meta">${escapeHtml(request.category || "기타")} · ${stamp(request.createdAt)} · 익명</div></div>`;
+          const status = document.createElement("span");
+          status.className = "status";
+          status.textContent = request.status || "접수";
+          head.appendChild(status);
+          const content = document.createElement("div");
+          content.className = "request-content";
+          content.textContent = request.content || "";
+          const actions = document.createElement("div");
+          actions.className = "actions left no-top";
+          const select = document.createElement("select");
+          select.className = "inline-select";
+          statuses.forEach(value => {
+            const option = document.createElement("option");
+            option.value = value;
+            option.textContent = value;
+            option.selected = value === (request.status || "접수");
+            select.appendChild(option);
           });
-
-          const deleteBtn = document.createElement("button");
-          deleteBtn.className = "btn danger mini";
-          deleteBtn.textContent = "삭제";
-          deleteBtn.addEventListener("click", async () => {
-            if (!confirm("이 요청을 삭제할까요? 삭제하면 다시 복구할 수 없습니다.")) return;
-            await deleteDoc(doc(db, "requests", req.id));
+          actions.appendChild(select);
+          actions.appendChild(button("상태 저장", "btn secondary mini", async () => {
+            await updateDoc(request.ref, { status:select.value, updatedAt:serverTimestamp() });
             await loadRequests();
-          });
-          control.appendChild(deleteBtn);
-
-          row.appendChild(control);
-          list.appendChild(row);
+          }));
+          actions.appendChild(button("요청 삭제", "btn danger mini", async () => {
+            if (!confirm("이 요청을 삭제할까요?")) return;
+            await deleteDoc(request.ref);
+            await loadRequests();
+          }));
+          item.append(head, content, actions);
+          $("requestsList").appendChild(item);
         });
-      } catch (e) {
-        showError("requestsList", e.message);
+      } catch (error) {
+        console.error(error);
+        $("requestsList").innerHTML = '<p class="small">요청 목록을 불러오지 못했습니다.</p>';
       }
     }
 
-    async function loadAll() {
-      await Promise.allSettled([loadUsers(), loadLogs(), loadRequests()]);
-    }
-
-    $("refreshUsersBtn").addEventListener("click", loadUsers);
-    $("refreshLogsBtn").addEventListener("click", loadLogs);
-    $("collapseLogsBtn").addEventListener("click", () => {
-      logsCollapsed = true;
-      document.querySelectorAll("#logsList details").forEach(item => item.open = false);
-    });
-    $("expandLogsBtn").addEventListener("click", () => {
-      logsCollapsed = false;
-      document.querySelectorAll("#logsList details").forEach(item => item.open = true);
-    });
-    $("deleteAllLogsBtn").addEventListener("click", async () => {
-      if (!currentLogs || currentLogs.length === 0) {
-        alert("삭제할 다운로드 기록이 없습니다.");
-        return;
-      }
-      if (!confirm(`다운로드 기록 전체 ${currentLogs.length}건을 삭제할까요?\n삭제하면 복구할 수 없습니다.`)) return;
-      await deleteLogsByIds(currentLogs.map(x => x.id), "다운로드 기록 전체를 삭제했습니다.");
-    });
-    $("refreshRequestsBtn").addEventListener("click", loadRequests);
-    $("logoutBtn").addEventListener("click", async () => {
-      await signOut(auth);
-      location.href = "login.html";
-    });
+    $("refreshUsersBtn").onclick = loadUsers;
+    $("refreshLogsBtn").onclick = loadLogs;
+    $("refreshRequestsBtn").onclick = loadRequests;
+    $("collapseLogsBtn").onclick = () => logDetails.forEach(detail => detail.open = false);
+    $("expandLogsBtn").onclick = () => logDetails.forEach(detail => detail.open = true);
+    $("deleteAllLogsBtn").onclick = async () => {
+      if (!confirm("모든 다운로드 기록을 삭제할까요?")) return;
+      const snap = await getDocs(collection(db, "downloadLogs"));
+      await deleteDocsInBatches(snap.docs);
+      await loadLogs();
+    };
+    $("logoutBtn").onclick = () => signOut(auth);
 
     onAuthStateChanged(auth, async user => {
+      currentAdmin = user;
       if (!user) {
-        $("adminStatus").innerHTML = "로그인이 필요합니다. <a href='login.html'>로그인</a>";
+        setAdminUi(false);
+        $("adminStatus").innerHTML = '관리자 로그인이 필요합니다. <a href="login.html">로그인하기</a>';
         return;
       }
-
-      $("logoutBtn").style.display = "inline-flex";
-
-      let profile = {};
       try {
-        const snap = await getDoc(doc(db, "users", user.uid));
-        profile = snap.exists() ? snap.data() : {};
-      } catch (e) {
-        profile = {};
+        if (!(await isAdmin(user))) {
+          setAdminUi(false);
+          $("adminStatus").textContent = "관리자 계정이 아닙니다.";
+          return;
+        }
+        setAdminUi(true);
+        $("adminStatus").textContent = `${user.email} 관리자 로그인 완료`;
+        await Promise.all([loadUsers(), loadLogs(), loadRequests()]);
+      } catch (error) {
+        console.error(error);
+        setAdminUi(false);
+        $("adminStatus").textContent = "관리자 권한을 확인하지 못했습니다.";
       }
-
-      const isAdmin = user.email === ADMIN_EMAIL || profile.role === "admin";
-      if (!isAdmin) {
-        $("adminStatus").textContent = "관리자 권한이 없습니다.";
-        return;
-      }
-
-      $("adminStatus").textContent = `${user.email} 관리자 로그인됨`;
-      $("usersCard").style.display = "block";
-      $("logsCard").style.display = "block";
-      $("requestsCard").style.display = "block";
-      await loadAll();
     });
   </script>
 </body>
