@@ -1,11 +1,11 @@
 {
-  "versionName": "1.0.132-native",
-  "versionCode": 133,
+  "versionName": "1.0.134-native",
+  "versionCode": 135,
   "downloadMode": "login-log-auto-approve",
   "downloadPageUrl": "https://lts7364.github.io/hwaiting-app/download.html",
   "apkUrl": "https://lts7364.github.io/hwaiting-app/download.html",
   "forceUpdate": false,
-  "updatedAt": "2026-06-14",
+  "updatedAt": "2026-06-15",
   "changelog": [
   "설정에 근무 색상 메뉴를 추가해 달력과 근무 위젯의 1·2·3·휴·주·야·교 색상을 함께 변경할 수 있습니다.",
     "기념일,메모장 탭이 추가되었습니다 ",
