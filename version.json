@@ -1,16 +1,15 @@
 {
-  "versionName": "1.0.134-native",
-  "versionCode": 135,
+  "versionName": "1.0.139-native",
+  "versionCode": 140,
   "downloadMode": "login-log-auto-approve",
   "downloadPageUrl": "https://lts7364.github.io/hwaiting-app/download.html",
   "apkUrl": "https://lts7364.github.io/hwaiting-app/download.html",
   "forceUpdate": false,
-  "updatedAt": "2026-06-15",
+  "updatedAt": "2026-06-16",
   "changelog": [
-  "설정에 근무 색상 메뉴를 추가해 달력과 근무 위젯의 1·2·3·휴·주·야·교 색상을 함께 변경할 수 있습니다.",
-    "기념일,메모장 탭이 추가되었습니다 ",
-    "기념일,위젯이 추가되었습니다.",
-    "달력에 상주가 추가되었습니다,알람권한도 함께 추가되었습니다.",
-    "바로가기 위젯이 추가 변경 되었습니다."
+    "교대조·상주 알람 카드를 현재 달력 보기와 관계없이 열고 실제 ON/OFF를 확인할 수 있습니다.",
+    "이미 켜진 알람은 어느 달력 보기에서도 끌 수 있고, 새로 켤 때만 해당 달력 선택을 확인합니다.",
+    "교대조와 상주 알람은 동시에 켜지지 않으며 전환 확인 후 한쪽만 유지됩니다.",
+    "불필요한 명절·1시간 전 안내 문구만 삭제하고 예약 방식과 공용 알람음 안내는 유지했습니다."
   ]
 }
