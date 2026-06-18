@@ -1,154 +1,234 @@
 <!doctype html>
 <html lang="ko">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>화이팅 다운로드</title>
-<style>
-:root{--bg:#f6f9ff;--card:#fff;--text:#1f2b3d;--muted:#6d7a8a;--line:#dce6f2;--primary:#2f7fe8;--primary2:#1f65c1;--danger:#d64545;--ok:#177a47;}
-*{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans KR",Arial,sans-serif;background:linear-gradient(180deg,#eef6ff,#fff);color:var(--text)}
-.wrap{max-width:720px;margin:0 auto;padding:22px 16px 44px}.card{background:var(--card);border:1px solid var(--line);border-radius:24px;padding:22px;margin:14px 0;box-shadow:0 10px 30px rgba(31,65,110,.08)}
-h1{font-size:30px;margin:0 0 8px}h2{font-size:20px;margin:0 0 10px}.muted{color:var(--muted);line-height:1.55}.badge{display:inline-flex;padding:6px 10px;border-radius:999px;background:#e9f3ff;color:var(--primary2);font-weight:800;font-size:13px;margin-bottom:10px}
-.btn{width:100%;display:block;text-align:center;text-decoration:none;border:none;border-radius:16px;padding:15px 16px;font-weight:900;font-size:16px;margin:10px 0;cursor:pointer}.primary{background:var(--primary);color:white}.primary:active{background:var(--primary2)}.ghost{background:#fff;color:var(--primary2);border:1px solid #bcd5f5}.danger{background:#fff3f3;color:var(--danger);border:1px solid #ffc8c8}.ok{color:var(--ok);font-weight:800}.hide{display:none!important}
-input{width:100%;border:1px solid var(--line);border-radius:14px;padding:14px;margin:7px 0;font-size:15px;background:#fff}label{font-size:13px;font-weight:800;color:#44546a}.row{display:flex;gap:10px}.row>*{flex:1}.small{font-size:12px}.log{white-space:pre-wrap;background:#f7f9fc;border:1px solid var(--line);border-radius:14px;padding:12px;color:#516070;font-size:13px;line-height:1.5}.list{padding-left:18px;line-height:1.7}.center{text-align:center}.footer{padding:20px 4px;text-align:center;color:#8a96a8;font-size:12px}
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>화이팅 다운로드</title>
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-<main class="wrap">
-  <section class="card">
-    <div class="badge">화이팅 업데이트</div>
-    <h1>앱 다운로드</h1>
-    <p class="muted">로그인 후 승인/차단 상태를 확인하고 APK를 받을 수 있습니다.</p>
-    <div id="versionBox" class="log">버전 정보 확인 중...</div>
-  </section>
+  <main class="page narrow">
+    <section class="hero small-hero">
+      <div class="badge">APK 다운로드</div>
+      <h1>다운로드</h1>
+      <p class="subtitle">로그인 후 화이팅 앱을 다운로드할 수 있습니다.</p>
+    </section>
 
-  <section id="authCard" class="card">
-    <h2>로그인</h2>
-    <label>이메일</label><input id="email" type="email" autocomplete="email" placeholder="이메일">
-    <label>비밀번호</label><input id="password" type="password" autocomplete="current-password" placeholder="비밀번호">
-    <button id="loginBtn" class="btn primary">로그인</button>
-    <button id="signupOpenBtn" class="btn ghost">처음 이용해요 / 회원가입</button>
-    <button id="resetBtn" class="btn ghost">비밀번호 재설정 메일 받기</button>
-    <div id="signupBox" class="hide">
-      <hr style="border:none;border-top:1px solid var(--line);margin:18px 0">
-      <h2>회원가입</h2>
-      <label>이름</label><input id="name" placeholder="이름">
-      <label>부서</label><input id="department" placeholder="부서">
-      <label>가입 이메일</label><input id="signupEmail" type="email" autocomplete="email" placeholder="이메일">
-      <label>비밀번호</label><input id="signupPassword" type="password" autocomplete="new-password" placeholder="비밀번호">
-      <button id="signupBtn" class="btn primary">회원가입</button>
-    </div>
-    <p id="authMsg" class="muted small"></p>
-  </section>
+    <section class="card notice-card">
+      <h2>다운로드 전 안내</h2>
+      <p>이 앱은 개인 편의를 위한 비공식 앱이며, 회사 또는 특정 기관의 공식 앱이 아닙니다.</p>
+      <p>근무 정보는 참고용이므로 실제 근무표와 공식 공지를 우선 확인해 주세요.</p>
+      <p>무단 재배포는 권장하지 않습니다.</p>
+    </section>
 
-  <section id="downloadCard" class="card hide">
-    <h2>다운로드 가능</h2>
-    <p id="userInfo" class="muted"></p>
-    <a id="downloadLink" class="btn primary" href="#" download>APK 다운로드</a>
-    <button id="logoutBtn" class="btn ghost">로그아웃</button>
-    <p id="downloadMsg" class="muted small"></p>
-  </section>
+    <section class="card done-card">
+      <h2 id="downloadTitle" class="download-title">확인 중...</h2>
+      <p id="userInfo" class="small">로그인 상태를 확인하고 있습니다.</p>
+      <p id="downloadStatus" class="small top-gap"></p>
+      <div class="actions">
+        <button class="btn primary" id="downloadBtn" style="display:none;">APK 다운로드</button>
+        <a class="btn primary" id="loginLink" href="login.html" style="display:none;">로그인 / 회원가입</a>
+      </div>
+      <div class="text-links" id="subLinks" style="display:none;">
+        <a href="request.html">요청함에 남기기</a>
+        <button id="logoutBtn" type="button">로그아웃</button>
+      </div>
+    </section>
 
-  <section id="blockedCard" class="card hide">
-    <h2>다운로드 불가</h2>
-    <p id="blockedMsg" class="muted"></p>
-    <button id="blockedLogoutBtn" class="btn ghost">로그아웃</button>
-  </section>
+    <section class="card">
+      <h2>설치 안내</h2>
+      <p class="small">APK 설치 시 휴대폰 설정에서 “알 수 없는 앱 설치 허용”이 필요할 수 있습니다.</p>
+    </section>
+  </main>
 
-  <section class="card">
-    <h2>설치 안내</h2>
-    <ul class="list muted">
-      <li>APK 다운로드 후 파일을 열어 설치합니다.</li>
-      <li>기존 화이팅 앱 위에 업데이트 설치됩니다.</li>
-      <li>설치가 막히면 브라우저의 알 수 없는 앱 설치 허용을 켜세요.</li>
-    </ul>
-  </section>
-</main>
-<script type="module">
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js';
-import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js';
-import { getFirestore, doc, getDoc, setDoc, collection, addDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
-import { firebaseConfig, APP_VERSION, APK_FILE } from './firebase-config.js';
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+    import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
+    import {
+      getFirestore, doc, getDoc, setDoc, addDoc, collection, serverTimestamp
+    } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
+    import { firebaseConfig, ADMIN_EMAIL, APP_VERSION, APK_FILE } from "./firebase-config.js";
 
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-const $ = (id) => document.getElementById(id);
-const apkUrl = new URL(APK_FILE, location.href).href;
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const $ = id => document.getElementById(id);
 
-$('versionBox').textContent = `현재 버전: ${APP_VERSION.versionName} / code${APP_VERSION.versionCode}
-APK: ${APK_FILE}`;
-$('downloadLink').href = apkUrl;
-$('downloadLink').setAttribute('download', APK_FILE.split('/').pop());
+    let currentUser = null;
+    let currentProfile = null;
+    let downloadInProgress = false;
+    let cooldownTimer = null;
+    const DOWNLOAD_COOLDOWN_MS = 2 * 60 * 1000;
 
-function show(...ids) {
-  ['authCard','downloadCard','blockedCard'].forEach(id => $(id).classList.add('hide'));
-  ids.forEach(id => $(id).classList.remove('hide'));
-}
-function msg(id, text) { $(id).textContent = text || ''; }
-function clean(s) { return (s || '').trim(); }
-
-$('signupOpenBtn').onclick = () => $('signupBox').classList.toggle('hide');
-$('loginBtn').onclick = async () => {
-  msg('authMsg','로그인 중...');
-  try { await signInWithEmailAndPassword(auth, clean($('email').value), $('password').value); msg('authMsg',''); }
-  catch(e) { msg('authMsg','로그인 실패: ' + (e.message || e)); }
-};
-$('signupBtn').onclick = async () => {
-  msg('authMsg','가입 처리 중...');
-  try {
-    const email = clean($('signupEmail').value);
-    const cred = await createUserWithEmailAndPassword(auth, email, $('signupPassword').value);
-    await setDoc(doc(db,'users',cred.user.uid), {
-      email, name: clean($('name').value), department: clean($('department').value),
-      approved: true, blocked: false, role: email === 'lts7364@gmail.com' ? 'admin' : 'user',
-      createdAt: serverTimestamp(), updatedAt: serverTimestamp()
-    }, { merge: true });
-    msg('authMsg','회원가입 완료. 다운로드 화면으로 이동합니다.');
-  } catch(e) { msg('authMsg','회원가입 실패: ' + (e.message || e)); }
-};
-$('resetBtn').onclick = async () => {
-  const email = clean($('email').value) || clean($('signupEmail').value);
-  if (!email) { msg('authMsg','이메일을 먼저 입력하세요.'); return; }
-  try { await sendPasswordResetEmail(auth, email); msg('authMsg','비밀번호 재설정 메일을 보냈습니다.'); }
-  catch(e) { msg('authMsg','메일 발송 실패: ' + (e.message || e)); }
-};
-$('logoutBtn').onclick = () => signOut(auth);
-$('blockedLogoutBtn').onclick = () => signOut(auth);
-$('downloadLink').onclick = async () => {
-  const user = auth.currentUser;
-  if (!user) return;
-  msg('downloadMsg','다운로드 기록 저장 중...');
-  try {
-    const userSnap = await getDoc(doc(db,'users',user.uid));
-    const u = userSnap.exists() ? userSnap.data() : {};
-    await addDoc(collection(db,'downloadLogs'), {
-      uid: user.uid, email: user.email || '', name: u.name || '', department: u.department || '',
-      versionName: APP_VERSION.versionName, versionCode: APP_VERSION.versionCode,
-      apkFile: APK_FILE, status: 'success', downloadedAt: serverTimestamp(), createdAt: serverTimestamp()
-    });
-    msg('downloadMsg','다운로드를 시작합니다.');
-  } catch(e) { msg('downloadMsg','기록 저장은 실패했지만 다운로드는 진행합니다: ' + (e.message || e)); }
-};
-
-onAuthStateChanged(auth, async (user) => {
-  if (!user) { show('authCard'); return; }
-  try {
-    const ref = doc(db,'users',user.uid);
-    let snap = await getDoc(ref);
-    if (!snap.exists()) {
-      await setDoc(ref, { email: user.email || '', approved: true, blocked: false, role: user.email === 'lts7364@gmail.com' ? 'admin' : 'user', createdAt: serverTimestamp(), updatedAt: serverTimestamp() }, { merge: true });
-      snap = await getDoc(ref);
+    function downloadLockKey() {
+      if (!currentUser) return null;
+      return `hwaitingDownloadCooldown:${currentUser.uid}:${APP_VERSION.versionCode}`;
     }
-    const u = snap.data() || {};
-    if (u.blocked === true) { $('blockedMsg').textContent = '관리자에 의해 차단된 계정입니다.'; show('blockedCard'); return; }
-    if (u.approved === false) { $('blockedMsg').textContent = '관리자 승인 대기 중입니다.'; show('blockedCard'); return; }
-    $('userInfo').textContent = `${u.name || user.email || ''} ${u.department ? ' / ' + u.department : ''}`;
-    show('downloadCard');
-  } catch(e) {
-    $('blockedMsg').textContent = '사용자 정보를 확인하지 못했습니다: ' + (e.message || e);
-    show('blockedCard');
-  }
-});
-</script>
+
+    function getCooldownRemainingMs() {
+      const key = downloadLockKey();
+      if (!key) return 0;
+      const until = Number(localStorage.getItem(key) || 0);
+      return Math.max(0, until - Date.now());
+    }
+
+    function setDownloadCooldown() {
+      const key = downloadLockKey();
+      if (!key) return;
+      localStorage.setItem(key, String(Date.now() + DOWNLOAD_COOLDOWN_MS));
+    }
+
+    function clearCooldownTimer() {
+      if (cooldownTimer) {
+        clearInterval(cooldownTimer);
+        cooldownTimer = null;
+      }
+    }
+
+    function updateDownloadButtonState() {
+      const btn = $("downloadBtn");
+      if (!btn || btn.style.display === "none") return;
+      const remaining = getCooldownRemainingMs();
+      if (downloadInProgress) {
+        btn.disabled = true;
+        btn.textContent = "다운로드 준비 중...";
+        return;
+      }
+      if (remaining > 0) {
+        const seconds = Math.ceil(remaining / 1000);
+        btn.disabled = true;
+        btn.textContent = `${seconds}초 후 다시 가능`;
+        $("downloadStatus").textContent = "중복 다운로드 방지를 위해 2분 후 다시 다운로드할 수 있습니다.";
+        return;
+      }
+      btn.disabled = false;
+      btn.textContent = "APK 다운로드";
+      $("downloadStatus").textContent = `최신 버전 ${APP_VERSION.versionName}`;
+    }
+
+    function startCooldownWatcher() {
+      clearCooldownTimer();
+      updateDownloadButtonState();
+      cooldownTimer = setInterval(() => {
+        updateDownloadButtonState();
+        if (!downloadInProgress && getCooldownRemainingMs() <= 0) {
+          clearCooldownTimer();
+        }
+      }, 1000);
+    }
+
+    async function ensureProfile(user) {
+      const ref = doc(db, "users", user.uid);
+      const snap = await getDoc(ref);
+      if (snap.exists()) return snap.data();
+
+      const role = user.email === ADMIN_EMAIL ? "admin" : "user";
+      const data = {
+        uid: user.uid,
+        email: user.email,
+        name: user.displayName || user.email.split("@")[0],
+        department: "",
+        approved: true,
+        blocked: false,
+        role,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      };
+      await setDoc(ref, data, { merge: true });
+      return data;
+    }
+
+    onAuthStateChanged(auth, async user => {
+      currentUser = user;
+      clearCooldownTimer();
+      downloadInProgress = false;
+
+      if (!user) {
+        $("downloadTitle").textContent = "로그인이 필요합니다";
+        $("userInfo").textContent = "앱을 받으려면 먼저 로그인하거나 회원가입해 주세요.";
+        $("loginLink").style.display = "inline-flex";
+        $("downloadBtn").style.display = "none";
+        $("subLinks").style.display = "none";
+        return;
+      }
+
+      try {
+        currentProfile = await ensureProfile(user);
+        $("subLinks").style.display = "flex";
+        $("loginLink").style.display = "none";
+
+        if (currentProfile.blocked === true) {
+          $("downloadTitle").textContent = "다운로드 불가";
+          $("userInfo").textContent = "이 계정은 다운로드가 차단되었습니다.";
+          $("downloadBtn").style.display = "none";
+          return;
+        }
+
+        $("downloadTitle").textContent = "다운로드 준비 완료";
+        $("userInfo").textContent = `${currentProfile.name || "사용자"}님, 화이팅 앱을 다운로드할 수 있습니다.`;
+        $("downloadBtn").style.display = "inline-flex";
+        startCooldownWatcher();
+      } catch (e) {
+        $("downloadTitle").textContent = "확인 실패";
+        $("userInfo").textContent = "사용자 정보를 불러오지 못했습니다.";
+        $("downloadStatus").textContent = e.message;
+      }
+    });
+
+    $("downloadBtn").addEventListener("click", async () => {
+      if (!currentUser || !currentProfile) {
+        location.href = "login.html";
+        return;
+      }
+      if (currentProfile.blocked === true) {
+        alert("다운로드가 차단된 계정입니다.");
+        return;
+      }
+      if (downloadInProgress || getCooldownRemainingMs() > 0) {
+        updateDownloadButtonState();
+        return;
+      }
+
+      downloadInProgress = true;
+      setDownloadCooldown();
+      updateDownloadButtonState();
+
+      try {
+        $("downloadStatus").textContent = "다운로드 준비 중입니다. 잠시만 기다려 주세요.";
+        await addDoc(collection(db, "downloadLogs"), {
+          uid: currentUser.uid,
+          email: currentUser.email,
+          name: currentProfile.name || "",
+          department: currentProfile.department || "",
+          versionName: APP_VERSION.versionName,
+          versionCode: APP_VERSION.versionCode,
+          apkFile: APK_FILE,
+          status: "success",
+          downloadedAt: serverTimestamp(),
+          userAgent: navigator.userAgent
+        });
+
+        $("downloadStatus").textContent = "APK 다운로드를 시작합니다. 중복 다운로드 방지를 위해 2분 후 다시 받을 수 있습니다.";
+        startCooldownWatcher();
+        setTimeout(() => {
+          downloadInProgress = false;
+          updateDownloadButtonState();
+        }, 2500);
+        window.location.href = APK_FILE;
+      } catch (e) {
+        const key = downloadLockKey();
+        if (key) localStorage.removeItem(key);
+        downloadInProgress = false;
+        updateDownloadButtonState();
+        alert("다운로드 실패: " + e.message);
+        $("downloadStatus").textContent = "다운로드 실패";
+      }
+    });
+
+    $("logoutBtn").addEventListener("click", async () => {
+      await signOut(auth);
+      location.href = "login.html";
+    });
+  </script>
 </body>
 </html>
