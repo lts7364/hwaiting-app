@@ -1,17 +1,15 @@
 {
-  "versionName": "1.0.155-native",
-  "versionCode": 156,
+  "versionName": "1.0.153-native",
+  "versionCode": 154,
   "downloadMode": "login-log-auto-approve",
   "downloadPageUrl": "https://lts7364.github.io/hwaiting-app/download.html",
   "apkUrl": "https://lts7364.github.io/hwaiting-app/download.html",
   "forceUpdate": false,
-  "updatedAt": "2026-06-18",
+  "updatedAt": "2026-06-17",
   "changelog": [
-    "점점 커지는 알람 볼륨 상승 속도를 빠르게 조정했습니다.",
-    "기본 알람음 / 휴대폰 음악 / 휴대폰 동영상 모두 약 15초 안에 최대 볼륨까지 올라가도록 수정했습니다.",
-    "볼륨 갱신 간격을 짧게 하여 알람 시작 후 더 빨리 크게 들리도록 개선했습니다.",
-    "알람 종료 시 기존 휴대폰 볼륨으로 복구하는 규칙은 그대로 유지했습니다.",
-    "진동만 / 소리만 / 소리+진동 선택 기능은 기존처럼 유지됩니다.",
-    "다운로드 페이지 404 방지를 위해 사이트 배포 파일에 index.html과 download.html 복구 파일을 포함했습니다."
+    "알람 동영상 기능 추가",
+    "통계 내 대체휴일·13휴일 통합.",
+    "휴가·연차 사용 개수 확인 기능 추가 .",
+    "상주 근무 반복 업무 기능 추가."
   ]
 }
