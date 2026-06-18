@@ -1,15 +1,16 @@
 {
-  "versionName": "1.0.155-native",
-  "versionCode": 156,
+  "versionName": "1.0.158-native",
+  "versionCode": 159,
   "downloadMode": "login-log-auto-approve",
   "downloadPageUrl": "https://lts7364.github.io/hwaiting-app/download.html",
   "apkUrl": "https://lts7364.github.io/hwaiting-app/download.html",
   "forceUpdate": false,
-  "updatedAt": "2026-06-18",
+  "updatedAt": "2026-06-19",
   "changelog": [
-    "점점 커지는 알람 볼륨 상승 속도를 빠르게 조정했습니다.",
-    "기본 알람음, 휴대폰 음악, 휴대폰 동영상 모두 더 빠르게 커지도록 개선했습니다.",
-    "휴대폰 음악과 동영상 알람 종료 시 기존 미디어 볼륨으로 복구되도록 유지했습니다.",
-    "진동만 / 소리만 / 소리+진동 선택 기능을 유지했습니다."
+    "본 알람 재생에 진동만 / 소리만 / 소리+진동 알림 방식 선택을 추가했습니다.",
+    "휴대폰 음악 알람이 낮은 볼륨에서 시작해 점점 크게 재생되도록 수정했습니다.",
+    "휴대폰 동영상 알람도 기존 VideoView 구조를 유지하면서 소리가 점점 커지도록 수정했습니다.",
+    "기본 알람음도 점점 크게 재생하고 알람 종료 시 기존 볼륨으로 복구합니다.",
+    "알람 끄기 / 10분 후 / 20분 후 / 종료 / 실패 전환 시 볼륨 증가 작업과 진동을 정리합니다."
   ]
 }
