@@ -1,15 +1,15 @@
 {
-  "versionName": "1.0.153-native",
-  "versionCode": 154,
+  "versionName": "1.0.155-native",
+  "versionCode": 156,
   "downloadMode": "login-log-auto-approve",
   "downloadPageUrl": "https://lts7364.github.io/hwaiting-app/download.html",
   "apkUrl": "https://lts7364.github.io/hwaiting-app/download.html",
   "forceUpdate": false,
-  "updatedAt": "2026-06-17",
+  "updatedAt": "2026-06-18",
   "changelog": [
-    "알람 동영상 기능 추가",
-    "통계 내 대체휴일·13휴일 통합.",
-    "휴가·연차 사용 개수 확인 기능 추가 .",
-    "상주 근무 반복 업무 기능 추가."
+    "점점 커지는 알람 볼륨 상승 속도를 빠르게 조정했습니다.",
+    "기본 알람음, 휴대폰 음악, 휴대폰 동영상 모두 더 빠르게 커지도록 개선했습니다.",
+    "휴대폰 음악과 동영상 알람 종료 시 기존 미디어 볼륨으로 복구되도록 유지했습니다.",
+    "진동만 / 소리만 / 소리+진동 선택 기능을 유지했습니다."
   ]
 }
