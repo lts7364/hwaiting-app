@@ -1,6 +1,6 @@
 {
-  "versionName": "1.0.160-native",
-  "versionCode": 161,
+  "versionName": "1.0.162-native",
+  "versionCode": 163,
   "downloadMode": "login-log-auto-approve",
   "downloadPageUrl": "https://lts7364.github.io/hwaiting-app/download.html",
   "apkUrl": "https://lts7364.github.io/hwaiting-app/download.html",
@@ -11,6 +11,6 @@
     "투명도 조절을 슬라이더 방식으로 바꾸고, 움직이는 즉시 미리보기에 반영되도록 했습니다.",
     "미리보기에는 등록된 다음 기념일이 있으면 실제 항목을, 없으면 안내 문구를 표시합니다.",
     "저장하면 작은/큰/가로 기념일 위젯에 같은 투명도 값이 적용됩니다.",
-    "13휴일을 13휴유로 변경하였습니다."
+    "13휴일을 13유휴로 변경하였습니다."
   ]
-}
+}"
