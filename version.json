@@ -1,16 +1,14 @@
 {
-  "versionName": "1.0.162-native",
-  "versionCode": 163,
+  "versionName": "1.0.164-native",
+  "versionCode": 165,
   "downloadMode": "login-log-auto-approve",
   "downloadPageUrl": "https://lts7364.github.io/hwaiting-app/download.html",
   "apkUrl": "https://lts7364.github.io/hwaiting-app/download.html",
   "forceUpdate": false,
-  "updatedAt": "2026-06-26",
+  "updatedAt": "2026-07-02",
   "changelog": [
-    "기념일 위젯 설정 화면에 투명도 미리보기 카드를 추가했습니다.",
-    "투명도 조절을 슬라이더 방식으로 바꾸고, 움직이는 즉시 미리보기에 반영되도록 했습니다.",
-    "미리보기에는 등록된 다음 기념일이 있으면 실제 항목을, 없으면 안내 문구를 표시합니다.",
-    "저장하면 작은/큰/가로 기념일 위젯에 같은 투명도 값이 적용됩니다.",
-    "13휴일을 13유휴로 변경하였습니다."
+    "근무 5일 위젯 + 주간 위젯 배경 투명도 슬라이더 적용.",
+    "슬라이더 움직이면 미리보기 카드 투명도 즉시 변경.",
+    "저장하면 실제 근무 5일/주간 위젯에 같은 투명도 적용5일 위젯 날짜칸 상단에 요일 표시 추가."
   ]
 }
