@@ -200,10 +200,14 @@ function injectStyles() {
     #releaseManagerCard .rm-quick-copy b{display:block;font-size:15px;color:#285f32;margin-bottom:3px}
     #releaseManagerCard .rm-quick-copy span{display:block;font-size:12px;color:#58705d;line-height:1.55}
     #releaseManagerCard .rm-auto{min-height:46px;padding:0 17px;font-size:13px;box-shadow:0 5px 12px rgba(59,127,71,.18)}
+    #releaseManagerCard .rm-simple-steps{display:grid;grid-template-columns:1.25fr 1fr 1fr;gap:9px;margin-top:12px}
+    #releaseManagerCard .rm-simple-steps .rm-btn{min-height:46px;font-size:13px}
+    #releaseManagerCard .rm-advanced{margin-top:14px;border-top:1px solid #e5dac8;padding-top:12px}
     @media(max-width:620px){
       #releaseManagerCard .rm-summary-grid,#releaseManagerCard .rm-grid{grid-template-columns:1fr}
       #releaseManagerCard .rm-wide{grid-column:1}
       #releaseManagerCard .rm-btn{flex:1 1 calc(50% - 8px)}
+      #releaseManagerCard .rm-simple-steps{grid-template-columns:1fr}
     }
   `;
   document.head.appendChild(style);
@@ -268,41 +272,37 @@ async function initAdminPage(options) {
   card.id = "releaseManagerCard";
   card.style.display = "none";
   card.innerHTML = `
-    <h2>앱 업데이트 관리</h2>
-    <p class="rm-help">새 APK를 먼저 올려 관리자만 시험한 뒤, <b>업데이트 적용</b>을 눌렀을 때 공개합니다.</p>
-    <div class="rm-quick">
-      <div class="rm-quick-copy">
-        <b>가장 쉬운 준비 등록</b>
-        <span>GitHub <b>files/</b> 폴더에 APK만 올린 뒤 이 버튼을 누르면 최신 APK를 찾아 버전·코드·경로를 자동 저장합니다.</span>
-      </div>
-      <button class="rm-btn rm-primary rm-auto" id="rmAutoStage" type="button">새 APK 찾기 · 준비 등록</button>
-    </div>
+    <h2>앱 업데이트</h2>
+    <p class="rm-help"><b>APK 올리기 → 준비 등록 → 테스트 → 업데이트 적용</b> 순서로 진행하면 됩니다.</p>
     <div class="rm-summary-grid">
-      <div class="rm-summary"><b>현재 공개 버전</b><strong id="rmCurrentLabel">확인 중...</strong><span id="rmCurrentFile"></span></div>
-      <div class="rm-summary"><b>다음 준비 버전</b><strong id="rmStagedLabel">등록 안 됨</strong><span id="rmStagedFile"></span></div>
+      <div class="rm-summary"><b>현재 공개</b><strong id="rmCurrentLabel">확인 중...</strong><span id="rmCurrentFile"></span></div>
+      <div class="rm-summary"><b>다음 준비</b><strong id="rmStagedLabel">등록 안 됨</strong><span id="rmStagedFile"></span></div>
     </div>
-    <div class="rm-grid">
-      <label>다음 versionName<input id="rmVersionName" placeholder="1.0.166-native"></label>
-      <label>다음 versionCode<input id="rmVersionCode" type="number" min="1" placeholder="167"></label>
-      <label class="rm-wide">APK 파일 경로<input id="rmApkFile" placeholder="files/hwaiting-v1-0-166-code167.apk"></label>
-      <label class="rm-wide">변경내역 (선택)<textarea id="rmChangelog" placeholder="비워도 자동 준비 등록됩니다. 필요할 때만 한 줄에 한 항목씩 입력"></textarea></label>
+    <label class="rm-wide">변경내역 (선택)<textarea id="rmChangelog" placeholder="필요할 때만 한 줄에 한 항목씩 입력하세요."></textarea></label>
+    <div class="rm-simple-steps">
+      <button class="rm-btn rm-primary rm-auto" id="rmAutoStage" type="button">1. 새 APK 찾아 준비 등록</button>
+      <button class="rm-btn rm-accent" id="rmTest" type="button">2. 테스트 다운로드</button>
+      <button class="rm-btn rm-primary" id="rmPublish" type="button">3. 업데이트 적용</button>
     </div>
     <div id="rmStatus" class="rm-status">관리자 권한 확인 중...</div>
-    <div class="rm-actions">
-      <button class="rm-btn rm-secondary" id="rmInitCurrent" type="button">현재 버전 초기등록</button>
-      <button class="rm-btn rm-secondary" id="rmSave" type="button">다음 버전 저장</button>
-      <button class="rm-btn rm-accent" id="rmTest" type="button">관리자 테스트 다운로드</button>
-      <button class="rm-btn rm-primary" id="rmPublish" type="button">업데이트 적용</button>
-      <button class="rm-btn rm-secondary" id="rmDelete" type="button">준비 버전 삭제</button>
-      <button class="rm-btn rm-danger" id="rmSuspend" type="button">현재 공개 중단</button>
-      <button class="rm-btn rm-secondary" id="rmResume" type="button">현재 공개 재개</button>
-      <button class="rm-btn rm-secondary" id="rmRollback" type="button">이전 버전 복원</button>
-      <button class="rm-btn rm-secondary" id="rmCopyJson" type="button">version.json 내용 복사</button>
-    </div>
-    <div class="rm-note">처음 한 번은 기존 앱 사용자도 새 방식을 지원하는 버전으로 넘어와야 합니다. 그 첫 공개 때만 복사한 version.json 내용을 GitHub에 수동 적용하세요.</div>
-    <details>
-      <summary>최근 업데이트 기록 보기</summary>
-      <div id="rmHistory" class="rm-history">확인 중...</div>
+    <details class="rm-advanced">
+      <summary>고급 관리</summary>
+      <p class="rm-help">자동 찾기가 안 될 때 직접 입력하거나, 공개 중단·복원이 필요할 때만 사용하세요.</p>
+      <div class="rm-grid">
+        <label>versionName<input id="rmVersionName" placeholder="1.0.171-native"></label>
+        <label>versionCode<input id="rmVersionCode" type="number" min="1" placeholder="172"></label>
+        <label class="rm-wide">APK 파일 경로<input id="rmApkFile" placeholder="files/hwaiting-v1-0-171-code172.apk"></label>
+      </div>
+      <div class="rm-actions">
+        <button class="rm-btn rm-secondary" id="rmSave" type="button">직접 준비 저장</button>
+        <button class="rm-btn rm-secondary" id="rmDelete" type="button">준비 취소</button>
+        <button class="rm-btn rm-danger" id="rmToggleSuspend" type="button">현재 공개 중단</button>
+        <button class="rm-btn rm-secondary" id="rmRollback" type="button">이전 버전 복원</button>
+      </div>
+      <details>
+        <summary>최근 업데이트 기록</summary>
+        <div id="rmHistory" class="rm-history">확인 중...</div>
+      </details>
     </details>
   `;
 
@@ -355,6 +355,13 @@ async function initAdminPage(options) {
       ? `${staged.versionName} / code${staged.versionCode} · 준비 중`
       : "등록 안 됨";
     el("rmStagedFile").textContent = staged?.apkFile || "";
+    el("rmTest").disabled = !staged?.versionCode;
+    el("rmPublish").disabled = !staged?.versionCode;
+    el("rmDelete").disabled = !staged?.versionCode;
+    el("rmToggleSuspend").textContent = current?.suspended ? "현재 공개 재개" : "현재 공개 중단";
+    el("rmToggleSuspend").className = current?.suspended
+      ? "rm-btn rm-primary"
+      : "rm-btn rm-danger";
 
     if (!history.length) {
       el("rmHistory").textContent = "업데이트 기록이 아직 없습니다.";
@@ -401,24 +408,6 @@ async function initAdminPage(options) {
       recordedAtText: now.toLocaleString("ko-KR")
     });
   }
-
-  el("rmInitCurrent").addEventListener("click", async () => {
-    try {
-      const existing = await storeApi.getDoc(currentRef);
-      if (existing.exists() && !confirm("현재 공개 버전 문서가 이미 있습니다. 기존 내용으로 다시 저장할까요?")) return;
-      const initial = {
-        ...normalizeRelease(null, options.fallbackVersion, options.fallbackFile),
-        status: "public",
-        suspended: false,
-        updatedAt: new Date().toISOString().slice(0, 10)
-      };
-      await storeApi.setDoc(currentRef, initial);
-      showStatus("현재 공개 버전을 Firestore에 초기 등록했습니다.");
-      await loadAll();
-    } catch (error) {
-      showStatus(error.message || String(error), true);
-    }
-  });
 
   el("rmAutoStage").addEventListener("click", async () => {
     const button = el("rmAutoStage");
@@ -513,7 +502,7 @@ async function initAdminPage(options) {
       await storeApi.setDoc(currentRef, publicRelease);
       await addHistory(publicRelease, "publish");
       await storeApi.deleteDoc(stagedRef);
-      showStatus("업데이트 적용 완료: 새 방식을 지원하는 앱과 홈페이지에 새 버전이 공개됐습니다.");
+      showStatus("업데이트 적용 완료: 일반 사용자에게 새 버전이 공개됐습니다.");
       await loadAll();
     } catch (error) {
       showStatus(error.message || String(error), true);
@@ -531,31 +520,20 @@ async function initAdminPage(options) {
     }
   });
 
-  el("rmSuspend").addEventListener("click", async () => {
+  el("rmToggleSuspend").addEventListener("click", async () => {
     try {
-      if (!confirm("현재 공개 다운로드와 새 방식의 앱 업데이트 감지를 중단할까요?")) return;
+      const shouldResume = current?.suspended === true;
+      const question = shouldResume
+        ? "현재 버전 공개를 다시 시작할까요?"
+        : "현재 공개 다운로드와 앱 업데이트 감지를 중단할까요?";
+      if (!confirm(question)) return;
       await storeApi.setDoc(currentRef, {
-        suspended: true,
-        status: "suspended",
+        suspended: !shouldResume,
+        status: shouldResume ? "public" : "suspended",
         updatedAt: new Date().toISOString().slice(0, 10)
       }, { merge: true });
-      await addHistory(current, "suspend");
-      showStatus("현재 공개를 중단했습니다.");
-      await loadAll();
-    } catch (error) {
-      showStatus(error.message || String(error), true);
-    }
-  });
-
-  el("rmResume").addEventListener("click", async () => {
-    try {
-      await storeApi.setDoc(currentRef, {
-        suspended: false,
-        status: "public",
-        updatedAt: new Date().toISOString().slice(0, 10)
-      }, { merge: true });
-      await addHistory(current, "resume");
-      showStatus("현재 버전 공개를 다시 시작했습니다.");
+      await addHistory(current, shouldResume ? "resume" : "suspend");
+      showStatus(shouldResume ? "현재 버전 공개를 다시 시작했습니다." : "현재 공개를 중단했습니다.");
       await loadAll();
     } catch (error) {
       showStatus(error.message || String(error), true);
@@ -586,25 +564,6 @@ async function initAdminPage(options) {
     }
   });
 
-  el("rmCopyJson").addEventListener("click", async () => {
-    try {
-      const value = {
-        versionName: current.versionName,
-        versionCode: Number(current.versionCode),
-        downloadMode: "login-log-auto-approve",
-        downloadPageUrl: "https://lts7364.github.io/hwaiting-app/download.html",
-        apkUrl: "https://lts7364.github.io/hwaiting-app/download.html",
-        forceUpdate: false,
-        updatedAt: current.updatedAt || new Date().toISOString().slice(0, 10),
-        changelog: current.changelog || []
-      };
-      await navigator.clipboard.writeText(JSON.stringify(value, null, 2));
-      showStatus("현재 공개 버전의 version.json 내용을 클립보드에 복사했습니다.");
-    } catch (error) {
-      showStatus(`복사 실패: ${error.message || error}`, true);
-    }
-  });
-
   authApi.onAuthStateChanged(auth, async user => {
     const isAdmin = user && String(user.email || "").toLowerCase() === String(options.adminEmail || "").toLowerCase();
     card.style.display = isAdmin ? "block" : "none";
@@ -626,7 +585,7 @@ export async function initReleaseManager(options) {
   if (/admin\.html(?:$|[?#])/.test(path)) {
     await initAdminPage(options);
     try {
-      const manager = await import("./admin-user-download-manager.js?v=117");
+      const manager = await import("./admin-user-download-manager.js?v=118");
       await manager.initAdminUserDownloadManager(options);
     } catch (error) {
       console.info("[화이팅] 사용자·다운로드 통합 관리 화면을 불러오지 못했습니다.", error);
