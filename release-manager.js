@@ -203,6 +203,14 @@ function injectStyles() {
     #releaseManagerCard .rm-simple-steps{display:grid;grid-template-columns:1.25fr 1fr 1fr;gap:9px;margin-top:12px}
     #releaseManagerCard .rm-simple-steps .rm-btn{min-height:46px;font-size:13px}
     #releaseManagerCard .rm-advanced{margin-top:14px;border-top:1px solid #e5dac8;padding-top:12px}
+    #releaseManagerCard .rm-modal{position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;padding:18px;box-sizing:border-box}
+    #releaseManagerCard .rm-modal[hidden]{display:none}
+    #releaseManagerCard .rm-modal-backdrop{position:absolute;inset:0;background:rgba(20,28,24,.56)}
+    #releaseManagerCard .rm-modal-box{position:relative;width:min(520px,100%);max-height:calc(100vh - 36px);overflow:auto;background:#fffaf1;border:2px solid #d7b37a;border-radius:24px;padding:20px;box-shadow:0 22px 60px rgba(0,0,0,.25);box-sizing:border-box}
+    #releaseManagerCard .rm-modal-box h3{margin:0 0 7px;font-size:19px}
+    #releaseManagerCard .rm-modal-file{margin:0 0 14px;padding:11px 12px;border-radius:14px;background:#edf7ee;color:#285f32;font-size:12px;line-height:1.55;overflow-wrap:anywhere;white-space:pre-wrap}
+    #releaseManagerCard .rm-modal-guide{margin:7px 0 0;color:#6d756b;font-size:11px;line-height:1.5}
+    #releaseManagerCard .rm-modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:15px}
     @media(max-width:620px){
       #releaseManagerCard .rm-summary-grid,#releaseManagerCard .rm-grid{grid-template-columns:1fr}
       #releaseManagerCard .rm-wide{grid-column:1}
@@ -278,7 +286,7 @@ async function initAdminPage(options) {
       <div class="rm-summary"><b>현재 공개</b><strong id="rmCurrentLabel">확인 중...</strong><span id="rmCurrentFile"></span></div>
       <div class="rm-summary"><b>다음 준비</b><strong id="rmStagedLabel">등록 안 됨</strong><span id="rmStagedFile"></span></div>
     </div>
-    <label class="rm-wide">변경내역 (선택)<textarea id="rmChangelog" placeholder="필요할 때만 한 줄에 한 항목씩 입력하세요."></textarea></label>
+    <div class="rm-note">`새 APK 찾아 준비 등록`을 누르면 변경내역 입력창이 열립니다. 비워두고 등록하면 변경내역 없이 저장됩니다.</div>
     <div class="rm-simple-steps">
       <button class="rm-btn rm-primary rm-auto" id="rmAutoStage" type="button">1. 새 APK 찾아 준비 등록</button>
       <button class="rm-btn rm-accent" id="rmTest" type="button">2. 테스트 다운로드</button>
@@ -292,6 +300,7 @@ async function initAdminPage(options) {
         <label>versionName<input id="rmVersionName" placeholder="1.0.171-native"></label>
         <label>versionCode<input id="rmVersionCode" type="number" min="1" placeholder="172"></label>
         <label class="rm-wide">APK 파일 경로<input id="rmApkFile" placeholder="files/hwaiting-v1-0-171-code172.apk"></label>
+        <label class="rm-wide">변경내역 (선택)<textarea id="rmAdvancedChangelog" placeholder="한 줄에 한 항목씩 입력하세요. 비워두면 변경내역 없이 저장됩니다."></textarea></label>
       </div>
       <div class="rm-actions">
         <button class="rm-btn rm-secondary" id="rmSave" type="button">직접 준비 저장</button>
@@ -304,6 +313,19 @@ async function initAdminPage(options) {
         <div id="rmHistory" class="rm-history">확인 중...</div>
       </details>
     </details>
+    <div id="rmStageModal" class="rm-modal" hidden>
+      <div class="rm-modal-backdrop" id="rmStageModalBackdrop"></div>
+      <section class="rm-modal-box" role="dialog" aria-modal="true" aria-labelledby="rmStageModalTitle">
+        <h3 id="rmStageModalTitle">다음 버전 준비 등록</h3>
+        <div id="rmStageFound" class="rm-modal-file"></div>
+        <label>변경내역 (선택)<textarea id="rmStageChangelog" placeholder="한 줄에 한 항목씩 입력하세요."></textarea></label>
+        <p class="rm-modal-guide">아무 내용도 적지 않고 등록하면 변경내역 없이 준비 버전이 저장됩니다.</p>
+        <div class="rm-modal-actions">
+          <button class="rm-btn rm-secondary" id="rmStageCancel" type="button">취소</button>
+          <button class="rm-btn rm-primary" id="rmStageConfirm" type="button">준비 등록</button>
+        </div>
+      </section>
+    </div>
   `;
 
   const usersCard = document.getElementById("usersCard");
@@ -329,12 +351,46 @@ async function initAdminPage(options) {
   let staged = null;
   let history = [];
 
+  function askStageChangelog(found) {
+    const modal = el("rmStageModal");
+    const input = el("rmStageChangelog");
+    const foundText = el("rmStageFound");
+    const samePrepared = Number(staged?.versionCode || 0) === Number(found?.versionCode || 0);
+    input.value = samePrepared ? (staged?.changelog || []).join("\n") : "";
+    foundText.textContent = `${found.versionName} / code${found.versionCode}\n${found.apkFile}`;
+    modal.hidden = false;
+    setTimeout(() => input.focus(), 0);
+
+    return new Promise(resolve => {
+      let done = false;
+      const finish = value => {
+        if (done) return;
+        done = true;
+        modal.hidden = true;
+        el("rmStageConfirm").removeEventListener("click", confirmHandler);
+        el("rmStageCancel").removeEventListener("click", cancelHandler);
+        el("rmStageModalBackdrop").removeEventListener("click", cancelHandler);
+        document.removeEventListener("keydown", keyHandler);
+        resolve(value);
+      };
+      const confirmHandler = () => finish(input.value);
+      const cancelHandler = () => finish(null);
+      const keyHandler = event => {
+        if (event.key === "Escape") cancelHandler();
+      };
+      el("rmStageConfirm").addEventListener("click", confirmHandler);
+      el("rmStageCancel").addEventListener("click", cancelHandler);
+      el("rmStageModalBackdrop").addEventListener("click", cancelHandler);
+      document.addEventListener("keydown", keyHandler);
+    });
+  }
+
   function formRelease() {
     return normalizeRelease({
       versionName: el("rmVersionName").value,
       versionCode: Number(el("rmVersionCode").value),
       apkFile: el("rmApkFile").value,
-      changelog: el("rmChangelog").value,
+      changelog: el("rmAdvancedChangelog").value,
       downloadPageUrl: "https://lts7364.github.io/hwaiting-app/download.html",
       status: "staged"
     }, null, "");
@@ -345,7 +401,7 @@ async function initAdminPage(options) {
     el("rmVersionName").value = data?.versionName || "";
     el("rmVersionCode").value = data?.versionCode || "";
     el("rmApkFile").value = data?.apkFile || "";
-    el("rmChangelog").value = (data?.changelog || []).join("\n");
+    el("rmAdvancedChangelog").value = (data?.changelog || []).join("\n");
   }
 
   function render() {
@@ -426,11 +482,17 @@ async function initAdminPage(options) {
         throw new Error(`APK 파일은 찾았지만 GitHub Pages 다운로드 주소에는 아직 반영되지 않았습니다. 1~3분 뒤 다시 눌러주세요.\n${error.message || error}`);
       }
 
+      const enteredChangelog = await askStageChangelog(found);
+      if (enteredChangelog === null) {
+        showStatus("준비 등록을 취소했습니다. APK 파일과 현재 공개 버전은 변경되지 않았습니다.");
+        return;
+      }
+
       const next = normalizeRelease({
         versionName: found.versionName,
         versionCode: found.versionCode,
         apkFile: found.apkFile,
-        changelog: el("rmChangelog").value,
+        changelog: enteredChangelog,
         downloadPageUrl: "https://lts7364.github.io/hwaiting-app/download.html",
         status: "staged"
       }, null, "");
@@ -585,7 +647,7 @@ export async function initReleaseManager(options) {
   if (/admin\.html(?:$|[?#])/.test(path)) {
     await initAdminPage(options);
     try {
-      const manager = await import("./admin-user-download-manager.js?v=118");
+      const manager = await import("./admin-user-download-manager.js?v=119");
       await manager.initAdminUserDownloadManager(options);
     } catch (error) {
       console.info("[화이팅] 사용자·다운로드 통합 관리 화면을 불러오지 못했습니다.", error);
