@@ -5,9 +5,6 @@
   "downloadPageUrl": "https://lts7364.github.io/hwaiting-app/download.html",
   "apkUrl": "https://lts7364.github.io/hwaiting-app/download.html",
   "forceUpdate": false,
-  "updatedAt": "2026-07-02",
-  "changelog": [
-    "근무  위젯에서도 오늘 날짜의 요일 위치가 '오늘'으로 표시되도록 수정했습니다.",
-    "근무 위젯 + 주간 위젯 배경 투명도 슬라이더 적용했습니다."
-  ]
+  "updatedAt": "2026-07-09",
+  "changelog": []
 }
