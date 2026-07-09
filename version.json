@@ -1,10 +1,15 @@
 {
-  "versionName": "1.0.164-native",
-  "versionCode": 165,
+  "versionName": "1.0.170-native",
+  "versionCode": 171,
   "downloadMode": "login-log-auto-approve",
   "downloadPageUrl": "https://lts7364.github.io/hwaiting-app/download.html",
   "apkUrl": "https://lts7364.github.io/hwaiting-app/download.html",
   "forceUpdate": false,
   "updatedAt": "2026-07-09",
-  "changelog": []
+  "changelog": [
+    "한 달 근무 위젯과 빠른 달력 이동 기능을 추가했습니다.",
+    "근무 위젯 날짜 선택과 전용 설정 팝업을 개선했습니다.",
+    "위젯 투명도와 오늘 날짜 표시를 개선했습니다.",
+    "메모 미리보기와 바로가기 위젯을 개선했습니다."
+  ]
 }
