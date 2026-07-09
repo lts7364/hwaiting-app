@@ -90,6 +90,75 @@ function safeRelativeApk(value) {
   return raw;
 }
 
+const GITHUB_APK_SOURCE = {
+  owner: "lts7364",
+  repository: "hwaiting-app",
+  branch: "main",
+  directory: "files"
+};
+
+function parseHwaitingApkFile(fileName) {
+  const name = String(fileName || "").trim();
+  const match = /^hwaiting-v(\d+)-(\d+)-(\d+)-code(\d+)\.apk$/i.exec(name);
+  if (!match) return null;
+
+  const versionCode = Number(match[4]);
+  if (!Number.isFinite(versionCode) || versionCode <= 0) return null;
+
+  return {
+    fileName: name,
+    versionName: `${Number(match[1])}.${Number(match[2])}.${Number(match[3])}-native`,
+    versionCode,
+    apkFile: `files/${name}`
+  };
+}
+
+async function findLatestGithubApk(minVersionCode) {
+  const { owner, repository, branch, directory } = GITHUB_APK_SOURCE;
+  const apiUrl = `https://api.github.com/repos/${encodeURIComponent(owner)}`
+    + `/${encodeURIComponent(repository)}/contents/${encodeURIComponent(directory)}`
+    + `?ref=${encodeURIComponent(branch)}&t=${Date.now()}`;
+
+  const response = await fetch(apiUrl, {
+    cache: "no-store",
+    headers: {
+      Accept: "application/vnd.github+json",
+      "X-GitHub-Api-Version": "2022-11-28"
+    }
+  });
+
+  if (!response.ok) {
+    const remaining = response.headers.get("x-ratelimit-remaining");
+    if (response.status === 403 && remaining === "0") {
+      throw new Error("GitHub 조회 횟수 제한에 걸렸습니다. 잠시 후 다시 눌러주세요.");
+    }
+    if (response.status === 404) {
+      throw new Error("GitHub의 files 폴더를 찾지 못했습니다. APK를 hwaiting-app/files/ 안에 올렸는지 확인해주세요.");
+    }
+    throw new Error(`GitHub APK 목록 확인 실패: HTTP ${response.status}`);
+  }
+
+  const items = await response.json();
+  if (!Array.isArray(items)) throw new Error("GitHub files 폴더 응답 형식이 올바르지 않습니다.");
+
+  const releases = items
+    .filter(item => item && item.type === "file")
+    .map(item => parseHwaitingApkFile(item.name))
+    .filter(Boolean)
+    .sort((a, b) => b.versionCode - a.versionCode || b.fileName.localeCompare(a.fileName));
+
+  if (!releases.length) {
+    throw new Error("규칙에 맞는 APK를 찾지 못했습니다. 파일명을 hwaiting-v1-0-171-code172.apk 형식으로 올려주세요.");
+  }
+
+  const minimum = Number(minVersionCode || 0);
+  const latest = releases.find(item => item.versionCode > minimum);
+  if (!latest) {
+    throw new Error(`현재 공개 code${minimum}보다 높은 새 APK를 찾지 못했습니다.`);
+  }
+  return latest;
+}
+
 function releaseLabel(release) {
   if (!release?.versionCode) return "등록된 버전 없음";
   const state = release.suspended ? "공개 중단" : "공개 중";
@@ -126,6 +195,11 @@ function injectStyles() {
     #releaseManagerCard summary{cursor:pointer;font-weight:900;font-size:13px}
     #releaseManagerCard .rm-history{margin-top:9px;font-size:12px;line-height:1.75;color:#66584c}
     #releaseManagerCard .rm-note{margin-top:12px;padding:11px;border-radius:14px;background:#fff4d7;border:1px solid #e8ca71;font-size:12px;line-height:1.55}
+    #releaseManagerCard .rm-quick{margin:0 0 14px;padding:14px;border-radius:17px;background:#edf7ee;border:2px solid #9bc8a0;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+    #releaseManagerCard .rm-quick-copy{flex:1 1 240px;min-width:0}
+    #releaseManagerCard .rm-quick-copy b{display:block;font-size:15px;color:#285f32;margin-bottom:3px}
+    #releaseManagerCard .rm-quick-copy span{display:block;font-size:12px;color:#58705d;line-height:1.55}
+    #releaseManagerCard .rm-auto{min-height:46px;padding:0 17px;font-size:13px;box-shadow:0 5px 12px rgba(59,127,71,.18)}
     @media(max-width:620px){
       #releaseManagerCard .rm-summary-grid,#releaseManagerCard .rm-grid{grid-template-columns:1fr}
       #releaseManagerCard .rm-wide{grid-column:1}
@@ -196,6 +270,13 @@ async function initAdminPage(options) {
   card.innerHTML = `
     <h2>앱 업데이트 관리</h2>
     <p class="rm-help">새 APK를 먼저 올려 관리자만 시험한 뒤, <b>업데이트 적용</b>을 눌렀을 때 공개합니다.</p>
+    <div class="rm-quick">
+      <div class="rm-quick-copy">
+        <b>가장 쉬운 준비 등록</b>
+        <span>GitHub <b>files/</b> 폴더에 APK만 올린 뒤 이 버튼을 누르면 최신 APK를 찾아 버전·코드·경로를 자동 저장합니다.</span>
+      </div>
+      <button class="rm-btn rm-primary rm-auto" id="rmAutoStage" type="button">새 APK 찾기 · 준비 등록</button>
+    </div>
     <div class="rm-summary-grid">
       <div class="rm-summary"><b>현재 공개 버전</b><strong id="rmCurrentLabel">확인 중...</strong><span id="rmCurrentFile"></span></div>
       <div class="rm-summary"><b>다음 준비 버전</b><strong id="rmStagedLabel">등록 안 됨</strong><span id="rmStagedFile"></span></div>
@@ -204,7 +285,7 @@ async function initAdminPage(options) {
       <label>다음 versionName<input id="rmVersionName" placeholder="1.0.166-native"></label>
       <label>다음 versionCode<input id="rmVersionCode" type="number" min="1" placeholder="167"></label>
       <label class="rm-wide">APK 파일 경로<input id="rmApkFile" placeholder="files/hwaiting-v1-0-166-code167.apk"></label>
-      <label class="rm-wide">변경내역<textarea id="rmChangelog" placeholder="한 줄에 한 항목씩 입력"></textarea></label>
+      <label class="rm-wide">변경내역 (선택)<textarea id="rmChangelog" placeholder="비워도 자동 준비 등록됩니다. 필요할 때만 한 줄에 한 항목씩 입력"></textarea></label>
     </div>
     <div id="rmStatus" class="rm-status">관리자 권한 확인 중...</div>
     <div class="rm-actions">
@@ -336,6 +417,49 @@ async function initAdminPage(options) {
       await loadAll();
     } catch (error) {
       showStatus(error.message || String(error), true);
+    }
+  });
+
+  el("rmAutoStage").addEventListener("click", async () => {
+    const button = el("rmAutoStage");
+    try {
+      button.disabled = true;
+      showStatus("GitHub files 폴더에서 가장 최신 APK를 찾고 있습니다...");
+
+      const found = await findLatestGithubApk(Number(current?.versionCode || 0));
+      el("rmVersionName").value = found.versionName;
+      el("rmVersionCode").value = String(found.versionCode);
+      el("rmApkFile").value = found.apkFile;
+
+      try {
+        await verifyApk(found.apkFile);
+      } catch (error) {
+        throw new Error(`APK 파일은 찾았지만 GitHub Pages 다운로드 주소에는 아직 반영되지 않았습니다. 1~3분 뒤 다시 눌러주세요.\n${error.message || error}`);
+      }
+
+      const next = normalizeRelease({
+        versionName: found.versionName,
+        versionCode: found.versionCode,
+        apkFile: found.apkFile,
+        changelog: el("rmChangelog").value,
+        downloadPageUrl: "https://lts7364.github.io/hwaiting-app/download.html",
+        status: "staged"
+      }, null, "");
+
+      await storeApi.setDoc(stagedRef, {
+        ...next,
+        status: "staged",
+        source: "github-auto-discovery",
+        discoveredFileName: found.fileName,
+        updatedAt: storeApi.serverTimestamp()
+      });
+
+      showStatus(`자동 준비 등록 완료\n${found.versionName} / code${found.versionCode}\n${found.apkFile}\n\n이제 관리자 테스트 다운로드 후 업데이트 적용을 누르면 됩니다.`);
+      await loadAll();
+    } catch (error) {
+      showStatus(error.message || String(error), true);
+    } finally {
+      button.disabled = false;
     }
   });
 
@@ -502,7 +626,7 @@ export async function initReleaseManager(options) {
   if (/admin\.html(?:$|[?#])/.test(path)) {
     await initAdminPage(options);
     try {
-      const manager = await import("./admin-user-download-manager.js?v=116");
+      const manager = await import("./admin-user-download-manager.js?v=117");
       await manager.initAdminUserDownloadManager(options);
     } catch (error) {
       console.info("[화이팅] 사용자·다운로드 통합 관리 화면을 불러오지 못했습니다.", error);

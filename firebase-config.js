@@ -12,10 +12,10 @@ export const ADMIN_EMAIL = "lts7364@gmail.com";
 // 현재 GitHub Pages에 공개된 버전의 안전한 대체값입니다.
 // Firestore appReleases/current 문서가 없거나 통신에 실패할 때만 사용합니다.
 const FALLBACK_VERSION = {
-  versionName: "1.0.164-native",
-  versionCode: 165
+  versionName: "1.0.170-native",
+  versionCode: 171
 };
-const FALLBACK_APK_FILE = "files/hwaiting-v1-0-164-code165.apk";
+const FALLBACK_APK_FILE = "files/hwaiting-v1-0-170-code171.apk";
 
 // 기존 download.html이 그대로 import해서 사용할 수 있도록 live binding으로 유지합니다.
 export let APP_VERSION = { ...FALLBACK_VERSION };
@@ -34,7 +34,7 @@ export let CURRENT_RELEASE = {
 const RELEASE_MANAGER_PAGE = /\/(admin|download)\.html(?:$|[?#])/.test(`${location.pathname}${location.search}${location.hash}`);
 if (RELEASE_MANAGER_PAGE) setTimeout(async () => {
   try {
-    const manager = await import("./release-manager.js?v=116");
+    const manager = await import("./release-manager.js?v=117");
     CURRENT_RELEASE = await manager.resolveCurrentRelease({
       firebaseConfig,
       fallbackVersion: FALLBACK_VERSION,
