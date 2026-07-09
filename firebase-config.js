@@ -34,7 +34,7 @@ export let CURRENT_RELEASE = {
 const RELEASE_MANAGER_PAGE = /\/(admin|download)\.html(?:$|[?#])/.test(`${location.pathname}${location.search}${location.hash}`);
 if (RELEASE_MANAGER_PAGE) setTimeout(async () => {
   try {
-    const manager = await import("./release-manager.js?v=114");
+    const manager = await import("./release-manager.js?v=115");
     CURRENT_RELEASE = await manager.resolveCurrentRelease({
       firebaseConfig,
       fallbackVersion: FALLBACK_VERSION,
