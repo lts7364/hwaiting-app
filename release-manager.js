@@ -286,7 +286,7 @@ async function initAdminPage(options) {
       <div class="rm-summary"><b>현재 공개</b><strong id="rmCurrentLabel">확인 중...</strong><span id="rmCurrentFile"></span></div>
       <div class="rm-summary"><b>다음 준비</b><strong id="rmStagedLabel">등록 안 됨</strong><span id="rmStagedFile"></span></div>
     </div>
-    <div class="rm-note">`새 APK 찾아 준비 등록`을 누르면 변경내역 입력창이 열립니다. 비워두고 등록하면 변경내역 없이 저장됩니다.</div>
+    <div class="rm-note"><b>새 APK 찾아 준비 등록</b>을 누르면 변경내역 입력창이 열립니다. 비워두고 등록하면 변경내역 없이 저장됩니다.</div>
     <div class="rm-simple-steps">
       <button class="rm-btn rm-primary rm-auto" id="rmAutoStage" type="button">1. 새 APK 찾아 준비 등록</button>
       <button class="rm-btn rm-accent" id="rmTest" type="button">2. 테스트 다운로드</button>
@@ -647,7 +647,7 @@ export async function initReleaseManager(options) {
   if (/admin\.html(?:$|[?#])/.test(path)) {
     await initAdminPage(options);
     try {
-      const manager = await import("./admin-user-download-manager.js?v=119");
+      const manager = await import("./admin-user-download-manager.js?v=120");
       await manager.initAdminUserDownloadManager(options);
     } catch (error) {
       console.info("[화이팅] 사용자·다운로드 통합 관리 화면을 불러오지 못했습니다.", error);
