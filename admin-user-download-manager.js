@@ -21,6 +21,9 @@ function injectStyles() {
   const style = document.createElement("style");
   style.id = "hwaitingUserDownloadManagerStyle";
   style.textContent = `
+    /* 기존 사용자 목록/다운로드 기록 카드는 통합 카드와 중복되므로 항상 숨깁니다.
+       기존 admin.html 스크립트가 나중에 display:block을 다시 넣어도 !important로 표시되지 않습니다. */
+    #usersCard,#logsCard{display:none !important}
     #userDownloadManagerCard{margin-top:14px}
     #userDownloadManagerCard .udm-help{margin:0 0 13px;color:#6d756b;font-size:13px;line-height:1.6}
     #userDownloadManagerCard .udm-toolbar{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;align-items:center;margin-bottom:10px}
@@ -207,9 +210,24 @@ export async function initAdminUserDownloadManager(options) {
   let loading = false;
 
   function hideOldCards() {
-    if (oldUsersCard) oldUsersCard.style.display = "none";
-    if (oldLogsCard) oldLogsCard.style.display = "none";
+    // 인라인 스타일도 함께 고정합니다. CSS의 !important가 최종 안전장치입니다.
+    if (oldUsersCard) {
+      oldUsersCard.style.setProperty("display", "none", "important");
+      oldUsersCard.setAttribute("aria-hidden", "true");
+    }
+    if (oldLogsCard) {
+      oldLogsCard.style.setProperty("display", "none", "important");
+      oldLogsCard.setAttribute("aria-hidden", "true");
+    }
   }
+
+  // 기존 admin.html 로직이 인증 완료 뒤 카드를 다시 표시하는 경우가 있어
+  // 해당 두 카드의 style 변경만 감시해 즉시 숨김 상태를 유지합니다.
+  hideOldCards();
+  const oldCardObserver = new MutationObserver(() => hideOldCards());
+  [oldUsersCard, oldLogsCard].filter(Boolean).forEach(node => {
+    oldCardObserver.observe(node, { attributes: true, attributeFilter: ["style", "class"] });
+  });
 
   async function loadData() {
     if (loading) return;
