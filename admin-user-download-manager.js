@@ -381,6 +381,16 @@ export async function initAdminUserDownloadManager(options) {
     const filter = $("udmFilter").value;
     const consumed = new Set();
     const mapped = users.map(user => ({ user, logs: linkedLogs(user, logs, consumed) }));
+    // 최근 다운로드한 사용자가 항상 위로 오도록 정렬합니다.
+    // 다운로드 기록이 없는 사용자는 아래로 보내고, 같은 시간은 이름순으로 안정 정렬합니다.
+    mapped.sort((a, b) => {
+      const latestA = a.logs.length ? valueMillis(logTime(a.logs[0])) : 0;
+      const latestB = b.logs.length ? valueMillis(logTime(b.logs[0])) : 0;
+      if (latestA !== latestB) return latestB - latestA;
+      const nameA = String(a.user.name || a.user.email || "");
+      const nameB = String(b.user.name || b.user.email || "");
+      return nameA.localeCompare(nameB, "ko");
+    });
     const orphanLogs = logs.filter(log => !consumed.has(log.id));
     const visible = mapped.filter(item => matchesFilter(item.user, item.logs, filter) && matchesSearch(item.user, item.logs, query));
 
