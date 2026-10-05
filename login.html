@@ -331,7 +331,7 @@
     onAuthStateChanged(auth, async user => {
       if (busyAction) return;
       if (!user) {
-        if (cards.every(id => $(id).classList.contains("hidden")) || !$(doneCard)?.classList) showCard("modeCard");
+        if (cards.every(id => $(id).classList.contains("hidden"))) showCard("modeCard");
         if (!$("doneCard").classList.contains("hidden")) showCard("modeCard");
         return;
       }
