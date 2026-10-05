@@ -130,6 +130,7 @@ export async function createSimpleAccount(auth, db, options) {
       usernameKey: username,
       uid,
       authEmail: email,
+      legacyEmail: legacyEmail || "",
       resetVersion: 0,
       createdAt: storeApi.serverTimestamp(),
       updatedAt: storeApi.serverTimestamp()
@@ -195,7 +196,7 @@ export async function resetSimplePassword(auth, db, options) {
       usernameKey: username,
       name,
       department,
-      legacyEmail: "",
+      legacyEmail: String(oldAlias.legacyEmail || ""),
       resetOfUid: oldUid,
       approved: autoReset,
       blocked: false,
