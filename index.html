@@ -36,15 +36,6 @@
       </div>
     </section>
 
-    <section class="card version-card">
-      <h2>최신 버전</h2>
-      <div class="version-grid">
-        <div><span class="label">버전명</span><strong id="versionName">불러오는 중...</strong></div>
-        <div><span class="label">버전코드</span><strong id="versionCode">-</strong></div>
-        <div><span class="label">업데이트</span><strong id="updatedAt">-</strong></div>
-      </div>
-    </section>
-
     <section class="card notice-card">
       <h2>안내</h2>
       <p>화이팅은 개인 편의를 위해 제작한 비공식 앱입니다.</p>
@@ -54,19 +45,5 @@
     <footer><p>화이팅 앱 배포 페이지</p></footer>
   </main>
 
-  <script>
-    async function loadVersion() {
-      try {
-        const response = await fetch("version.json", { cache: "no-store" });
-        const data = await response.json();
-        document.getElementById("versionName").textContent = data.versionName || "-";
-        document.getElementById("versionCode").textContent = data.versionCode ?? "-";
-        document.getElementById("updatedAt").textContent = data.updatedAt || "-";
-      } catch (_) {
-        document.getElementById("versionName").textContent = "확인 실패";
-      }
-    }
-    loadVersion();
-  </script>
 </body>
 </html>
