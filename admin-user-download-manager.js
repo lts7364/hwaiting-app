@@ -75,8 +75,15 @@ function injectStyles() {
     .ma-switch input:checked + .ma-slider{background:#3b7f47}
     .ma-switch input:checked + .ma-slider:before{transform:translateX(23px)}
     .ma-reset-list,.ma-user-list{display:grid;gap:10px;margin-top:12px}
-    .ma-reset,.ma-user{border:1px solid #e1d3bf;border-radius:16px;background:#f4ead9;padding:12px}
-    .ma-reset-head,.ma-user-head{display:flex;gap:10px;justify-content:space-between;align-items:flex-start}
+    .ma-reset{border:1px solid #e1d3bf;border-radius:16px;background:#f4ead9;padding:12px}
+    .ma-user{border:1px solid #e1d3bf;border-radius:16px;background:#f4ead9;overflow:hidden}
+    .ma-user>summary{list-style:none;cursor:pointer;padding:12px;display:flex;gap:10px;justify-content:space-between;align-items:flex-start}
+    .ma-user>summary::-webkit-details-marker{display:none}
+    .ma-user>summary:after{content:"펼치기";flex:0 0 auto;color:#3b7f47;font-size:11px;font-weight:900;padding:5px 8px;border-radius:999px;background:#edf7ee}
+    .ma-user[open]>summary:after{content:"접기"}
+    .ma-user[open]>summary{border-bottom:1px solid #dfd1bd}
+    .ma-user-body{padding:10px 12px 12px}
+    .ma-reset-head{display:flex;gap:10px;justify-content:space-between;align-items:flex-start}
     .ma-title{font-weight:900;font-size:15px;line-height:1.45}
     .ma-meta{margin-top:4px;color:#6d756b;font-size:12px;line-height:1.5;overflow-wrap:anywhere}
     .ma-badges{display:flex;gap:5px;flex-wrap:wrap;margin-top:7px}
@@ -97,7 +104,9 @@ function injectStyles() {
     .ma-section-title{margin:18px 0 0;font-size:16px}
     @media(max-width:620px){
       .ma-setting{grid-template-columns:1fr auto}
-      .ma-reset-head,.ma-user-head{display:block}
+      .ma-reset-head{display:block}
+      .ma-user>summary{display:block}
+      .ma-user>summary:after{display:inline-flex;margin-top:8px}
       .ma-actions{justify-content:flex-start;margin-top:9px}
       .ma-toolbar select{width:100%}
       .ma-log{grid-template-columns:1fr}
@@ -191,6 +200,8 @@ export async function initAdminUserDownloadManager(options) {
           <option value="blocked">차단 회원</option>
         </select>
         <button id="maRefresh" class="btn secondary mini" type="button">새로고침</button>
+        <button id="maCollapse" class="btn secondary mini" type="button">전체 접기</button>
+        <button id="maExpand" class="btn secondary mini" type="button">전체 펼치기</button>
       </div>
       <div id="maSummary" class="ma-summary">회원 정보를 확인하고 있습니다.</div>
       <div id="maUserList" class="ma-user-list"></div>
@@ -340,13 +351,14 @@ export async function initAdminUserDownloadManager(options) {
   }
 
   function createUserCard(user, userLogs) {
-    const card = document.createElement("div");
+    const card = document.createElement("details");
     card.className = "ma-user";
+    card.open = false;
+
     const simple = user.accountType === "simple";
     const identity = simple ? `아이디 ${user.username || "-"}` : (user.email || "이메일 없음");
 
-    const head = document.createElement("div");
-    head.className = "ma-user-head";
+    const head = document.createElement("summary");
     const info = document.createElement("div");
     info.innerHTML = `
       <div class="ma-title">${escapeHtml(user.name || "이름 없음")} · ${escapeHtml(user.department || "소속 없음")}</div>
@@ -359,6 +371,11 @@ export async function initAdminUserDownloadManager(options) {
         <span class="ma-badge">다운로드 ${userLogs.length}건</span>
       </div>
     `;
+    head.appendChild(info);
+    card.appendChild(head);
+
+    const body = document.createElement("div");
+    body.className = "ma-user-body";
 
     const actions = document.createElement("div");
     actions.className = "ma-actions";
@@ -377,8 +394,7 @@ export async function initAdminUserDownloadManager(options) {
         }
       }));
     }
-    head.append(info, actions);
-    card.appendChild(head);
+    body.appendChild(actions);
 
     const logsBox = document.createElement("div");
     logsBox.className = "ma-logs";
@@ -393,7 +409,8 @@ export async function initAdminUserDownloadManager(options) {
         logsBox.appendChild(more);
       }
     }
-    card.appendChild(logsBox);
+    body.appendChild(logsBox);
+    card.appendChild(body);
     return card;
   }
 
@@ -489,13 +506,19 @@ export async function initAdminUserDownloadManager(options) {
 
     const orphan = logs.filter(log => !consumed.has(log.id));
     if (orphan.length && filter === "all" && !query) {
-      const orphanBox = document.createElement("div");
+      const orphanBox = document.createElement("details");
       orphanBox.className = "ma-user";
-      orphanBox.innerHTML = `<div class="ma-title">연결되지 않은 과거 기록 · ${orphan.length}건</div><div class="ma-meta">현재 회원 정보와 UID·아이디·이메일이 일치하지 않는 기록입니다.</div>`;
+      orphanBox.open = false;
+      const summary = document.createElement("summary");
+      summary.innerHTML = `<div><div class="ma-title">연결되지 않은 과거 기록 · ${orphan.length}건</div><div class="ma-meta">현재 회원 정보와 UID·아이디·이메일이 일치하지 않는 기록입니다.</div></div>`;
+      orphanBox.appendChild(summary);
+      const body = document.createElement("div");
+      body.className = "ma-user-body";
       const logsBox = document.createElement("div");
       logsBox.className = "ma-logs";
       orphan.slice(0, 20).forEach(log => logsBox.appendChild(createLogRow(log)));
-      orphanBox.appendChild(logsBox);
+      body.appendChild(logsBox);
+      orphanBox.appendChild(body);
       box.appendChild(orphanBox);
     }
 
@@ -547,6 +570,12 @@ export async function initAdminUserDownloadManager(options) {
     loadAll();
   }));
   el("maRefresh").addEventListener("click", loadAll);
+  el("maCollapse").addEventListener("click", () => {
+    document.querySelectorAll("#maUserList details.ma-user").forEach(item => { item.open = false; });
+  });
+  el("maExpand").addEventListener("click", () => {
+    document.querySelectorAll("#maUserList details.ma-user").forEach(item => { item.open = true; });
+  });
   el("maSearch").addEventListener("input", renderUsers);
   el("maFilter").addEventListener("change", renderUsers);
 
