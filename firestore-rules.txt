@@ -24,38 +24,164 @@ service cloud.firestore {
       return isAdminEmail() || hasAdminRole();
     }
 
-    function isNotBlocked() {
-      return signedIn()
-        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.blocked != true;
+    function authSettingsExist() {
+      return exists(/databases/$(database)/documents/siteSettings/auth);
+    }
+
+    function autoApprove() {
+      return !authSettingsExist()
+        || get(/databases/$(database)/documents/siteSettings/auth).data.autoApprove == true;
+    }
+
+    function autoPasswordReset() {
+      return !authSettingsExist()
+        || get(/databases/$(database)/documents/siteSettings/auth).data.autoPasswordReset == true;
+    }
+
+    function userIsActive(uid) {
+      return exists(/databases/$(database)/documents/users/$(uid))
+        && get(/databases/$(database)/documents/users/$(uid)).data.approved == true
+        && get(/databases/$(database)/documents/users/$(uid)).data.blocked != true;
+    }
+
+    function simpleBase(uid) {
+      return isSelf(uid)
+        && request.resource.data.accountType == "simple"
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.authEmail == request.auth.token.email
+        && request.resource.data.username == request.resource.data.usernameKey
+        && request.resource.data.usernameKey.size() >= 4
+        && request.resource.data.usernameKey.size() <= 20
+        && request.resource.data.name.size() >= 1
+        && request.resource.data.name.size() <= 30
+        && request.resource.data.department.size() >= 1
+        && request.resource.data.department.size() <= 40
+        && request.resource.data.blocked == false
+        && request.resource.data.role == "user";
+    }
+
+    function isSimpleSignup(uid) {
+      return simpleBase(uid)
+        && request.resource.data.resetOfUid == ""
+        && !exists(/databases/$(database)/documents/simpleAliases/$(request.resource.data.usernameKey))
+        && request.resource.data.approved == autoApprove();
+    }
+
+    function isSimpleResetCandidate(uid) {
+      let aliasPath = /databases/$(database)/documents/simpleAliases/$(request.resource.data.usernameKey);
+      let alias = get(aliasPath).data;
+      let oldUser = get(/databases/$(database)/documents/users/$(alias.uid)).data;
+      return simpleBase(uid)
+        && exists(aliasPath)
+        && request.resource.data.resetOfUid == alias.uid
+        && oldUser.accountType == "simple"
+        && oldUser.usernameKey == request.resource.data.usernameKey
+        && oldUser.name == request.resource.data.name
+        && oldUser.department == request.resource.data.department
+        && oldUser.approved == true
+        && oldUser.blocked != true
+        && request.resource.data.approved == autoPasswordReset();
+    }
+
+    match /siteSettings/{settingId} {
+      allow read: if settingId == "auth";
+      allow create, update: if isAdmin();
+      allow delete: if false;
     }
 
     match /users/{uid} {
-      allow create: if isSelf(uid)
+      allow create: if (
+        isSelf(uid)
         && request.resource.data.email == request.auth.token.email
         && request.resource.data.approved == true
-        && request.resource.data.blocked == false;
+        && request.resource.data.blocked == false
+        && !request.resource.data.keys().hasAny(["accountType"])
+      ) || isSimpleSignup(uid) || isSimpleResetCandidate(uid);
 
       allow read: if isSelf(uid) || isAdmin();
       allow update: if isAdmin();
       allow delete: if false;
     }
 
+    match /simpleAliases/{usernameKey} {
+      allow get: if true;
+      allow list: if isAdmin();
+
+      allow create: if signedIn()
+        && request.auth.uid == request.resource.data.uid
+        && request.resource.data.usernameKey == usernameKey
+        && request.resource.data.username == usernameKey
+        && request.resource.data.authEmail == request.auth.token.email
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.accountType == "simple"
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.usernameKey == usernameKey
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.resetOfUid == "";
+
+      allow update: if isAdmin() || (
+        autoPasswordReset()
+        && signedIn()
+        && request.auth.uid == request.resource.data.uid
+        && request.resource.data.usernameKey == resource.data.usernameKey
+        && request.resource.data.username == resource.data.username
+        && request.resource.data.authEmail == request.auth.token.email
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.accountType == "simple"
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.usernameKey == usernameKey
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.resetOfUid == resource.data.uid
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.approved == true
+      );
+
+      allow delete: if isAdmin();
+    }
+
+    match /passwordResetRequests/{requestId} {
+      allow create: if signedIn()
+        && autoPasswordReset() == false
+        && request.resource.data.candidateUid == request.auth.uid
+        && request.resource.data.status == "pending"
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.accountType == "simple"
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.resetOfUid == request.resource.data.oldUid
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.usernameKey == request.resource.data.usernameKey
+        && exists(/databases/$(database)/documents/simpleAliases/$(request.resource.data.usernameKey))
+        && get(/databases/$(database)/documents/simpleAliases/$(request.resource.data.usernameKey)).data.uid == request.resource.data.oldUid;
+
+      allow read: if isAdmin() || (signedIn() && resource.data.candidateUid == request.auth.uid);
+      allow update, delete: if isAdmin();
+    }
+
     match /downloadLogs/{logId} {
-      allow create: if signedIn() && isNotBlocked();
+      allow create: if signedIn()
+        && request.resource.data.uid == request.auth.uid
+        && userIsActive(request.auth.uid);
       allow read: if isAdmin();
-      allow update, delete: if false;
+      allow update: if false;
+      allow delete: if isAdmin();
     }
 
     match /requests/{requestId} {
-      allow create: if signedIn()
-        && isNotBlocked()
-        && request.resource.data.uid == request.auth.uid
-        && request.resource.data.anonymous == true;
+      allow create: if request.resource.data.anonymous == true
+        && request.resource.data.source == "public-web";
 
-      allow read: if isAdmin() || (signedIn() && resource.data.uid == request.auth.uid);
+      allow read: if isAdmin() || (
+        signedIn()
+        && resource.data.uid == request.auth.uid
+      );
       allow update: if isAdmin();
-      allow delete: if isAdmin() || (signedIn() && resource.data.uid == request.auth.uid && resource.data.status in ["적용완료", "보류", "거절"]);
+      allow delete: if isAdmin() || (
+        signedIn()
+        && resource.data.uid == request.auth.uid
+        && resource.data.status in ["적용완료", "보류", "거절"]
+      );
+    }
+
+    match /appReleases/{releaseId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /appReleaseHistory/{historyId} {
+      allow read, create, update, delete: if isAdmin();
     }
   }
 }
