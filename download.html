@@ -11,14 +11,7 @@
     <section class="hero small-hero">
       <div class="badge">APK 다운로드</div>
       <h1>다운로드</h1>
-      <p class="subtitle">로그인 후 화이팅 앱을 다운로드할 수 있습니다.</p>
-    </section>
-
-    <section class="card notice-card">
-      <h2>다운로드 전 안내</h2>
-      <p>이 앱은 개인 편의를 위한 비공식 앱이며, 회사 또는 특정 기관의 공식 앱이 아닙니다.</p>
-      <p>근무 정보는 참고용이므로 실제 근무표와 공식 공지를 우선 확인해 주세요.</p>
-      <p>무단 재배포는 권장하지 않습니다.</p>
+      <p class="subtitle">로그인하면 최신 화이팅 앱을 바로 받을 수 있습니다.</p>
     </section>
 
     <section class="card done-card">
@@ -27,17 +20,20 @@
       <p id="downloadStatus" class="small top-gap"></p>
       <div class="actions">
         <button class="btn primary" id="downloadBtn" style="display:none;">APK 다운로드</button>
-        <a class="btn primary" id="loginLink" href="login.html" style="display:none;">로그인 / 회원가입</a>
+        <a class="btn primary" id="loginLink" href="login.html" style="display:none;">로그인</a>
+        <a class="btn secondary" id="signupLink" href="login.html?mode=signup" style="display:none;">회원가입</a>
       </div>
       <div class="text-links" id="subLinks" style="display:none;">
-        <a href="request.html">요청함에 남기기</a>
+        <a href="request.html">요청함</a>
+        <a href="guide.html">사용설명서</a>
         <button id="logoutBtn" type="button">로그아웃</button>
       </div>
     </section>
 
-    <section class="card">
+    <section class="card notice-card">
       <h2>설치 안내</h2>
-      <p class="small">APK 설치 시 휴대폰 설정에서 “알 수 없는 앱 설치 허용”이 필요할 수 있습니다.</p>
+      <p>APK 설치 시 휴대폰 설정에서 “알 수 없는 앱 설치 허용”이 필요할 수 있습니다.</p>
+      <p>이 앱은 개인 편의를 위한 비공식 앱이며 실제 근무표와 공식 공지를 우선 확인해 주세요.</p>
     </section>
   </main>
 
@@ -48,6 +44,7 @@
       getFirestore, doc, getDoc, setDoc, addDoc, collection, serverTimestamp
     } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
     import { firebaseConfig, ADMIN_EMAIL, APP_VERSION, APK_FILE } from "./firebase-config.js";
+    import { cleanEmail, isSimpleInternalEmail } from "./simple-auth.js?v=20261006";
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
@@ -74,8 +71,7 @@
 
     function setDownloadCooldown() {
       const key = downloadLockKey();
-      if (!key) return;
-      localStorage.setItem(key, String(Date.now() + DOWNLOAD_COOLDOWN_MS));
+      if (key) localStorage.setItem(key, String(Date.now() + DOWNLOAD_COOLDOWN_MS));
     }
 
     function clearCooldownTimer() {
@@ -95,10 +91,9 @@
         return;
       }
       if (remaining > 0) {
-        const seconds = Math.ceil(remaining / 1000);
         btn.disabled = true;
-        btn.textContent = `${seconds}초 후 다시 가능`;
-        $("downloadStatus").textContent = "중복 다운로드 방지를 위해 2분 후 다시 다운로드할 수 있습니다.";
+        btn.textContent = `${Math.ceil(remaining / 1000)}초 후 다시 가능`;
+        $("downloadStatus").textContent = "중복 다운로드 방지를 위해 2분 후 다시 받을 수 있습니다.";
         return;
       }
       btn.disabled = false;
@@ -111,9 +106,7 @@
       updateDownloadButtonState();
       cooldownTimer = setInterval(() => {
         updateDownloadButtonState();
-        if (!downloadInProgress && getCooldownRemainingMs() <= 0) {
-          clearCooldownTimer();
-        }
+        if (!downloadInProgress && getCooldownRemainingMs() <= 0) clearCooldownTimer();
       }, 1000);
     }
 
@@ -122,15 +115,19 @@
       const snap = await getDoc(ref);
       if (snap.exists()) return snap.data();
 
-      const role = user.email === ADMIN_EMAIL ? "admin" : "user";
+      if (isSimpleInternalEmail(user.email)) {
+        throw new Error("간편계정 정보를 찾을 수 없습니다.");
+      }
+
+      const email = cleanEmail(user.email);
       const data = {
         uid: user.uid,
-        email: user.email,
-        name: user.displayName || user.email.split("@")[0],
+        email,
+        name: user.displayName || (email ? email.split("@")[0] : "사용자"),
         department: "",
         approved: true,
         blocked: false,
-        role,
+        role: email === cleanEmail(ADMIN_EMAIL) ? "admin" : "user",
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       };
@@ -138,17 +135,23 @@
       return data;
     }
 
+    function showLoggedOut() {
+      $("downloadTitle").textContent = "로그인이 필요합니다";
+      $("userInfo").textContent = "앱을 받으려면 먼저 로그인해 주세요.";
+      $("loginLink").style.display = "inline-flex";
+      $("signupLink").style.display = "inline-flex";
+      $("downloadBtn").style.display = "none";
+      $("subLinks").style.display = "none";
+    }
+
     onAuthStateChanged(auth, async user => {
       currentUser = user;
+      currentProfile = null;
       clearCooldownTimer();
       downloadInProgress = false;
 
       if (!user) {
-        $("downloadTitle").textContent = "로그인이 필요합니다";
-        $("userInfo").textContent = "앱을 받으려면 먼저 로그인하거나 회원가입해 주세요.";
-        $("loginLink").style.display = "inline-flex";
-        $("downloadBtn").style.display = "none";
-        $("subLinks").style.display = "none";
+        showLoggedOut();
         return;
       }
 
@@ -156,22 +159,34 @@
         currentProfile = await ensureProfile(user);
         $("subLinks").style.display = "flex";
         $("loginLink").style.display = "none";
+        $("signupLink").style.display = "none";
 
         if (currentProfile.blocked === true) {
           $("downloadTitle").textContent = "다운로드 불가";
-          $("userInfo").textContent = "이 계정은 다운로드가 차단되었습니다.";
+          $("userInfo").textContent = "이 계정은 관리자가 차단했습니다.";
+          $("downloadBtn").style.display = "none";
+          return;
+        }
+
+        if (currentProfile.approved === false) {
+          $("downloadTitle").textContent = "승인 대기 중";
+          $("userInfo").textContent = "관리자 승인 후 다운로드할 수 있습니다.";
           $("downloadBtn").style.display = "none";
           return;
         }
 
         $("downloadTitle").textContent = "다운로드 준비 완료";
-        $("userInfo").textContent = `${currentProfile.name || "사용자"}님, 화이팅 앱을 다운로드할 수 있습니다.`;
+        const identity = currentProfile.accountType === "simple"
+          ? `${currentProfile.name || "사용자"}님 · ${currentProfile.username || "간편계정"}`
+          : `${currentProfile.name || "사용자"}님`;
+        $("userInfo").textContent = identity;
         $("downloadBtn").style.display = "inline-flex";
         startCooldownWatcher();
-      } catch (e) {
+      } catch (error) {
+        console.error(error);
         $("downloadTitle").textContent = "확인 실패";
         $("userInfo").textContent = "사용자 정보를 불러오지 못했습니다.";
-        $("downloadStatus").textContent = e.message;
+        $("downloadStatus").textContent = error?.message || "다시 로그인해 주세요.";
       }
     });
 
@@ -180,10 +195,7 @@
         location.href = "login.html";
         return;
       }
-      if (currentProfile.blocked === true) {
-        alert("다운로드가 차단된 계정입니다.");
-        return;
-      }
+      if (currentProfile.blocked === true || currentProfile.approved === false) return;
       if (downloadInProgress || getCooldownRemainingMs() > 0) {
         updateDownloadButtonState();
         return;
@@ -194,10 +206,13 @@
       updateDownloadButtonState();
 
       try {
-        $("downloadStatus").textContent = "다운로드 준비 중입니다. 잠시만 기다려 주세요.";
+        $("downloadStatus").textContent = "다운로드 준비 중입니다.";
         await addDoc(collection(db, "downloadLogs"), {
           uid: currentUser.uid,
-          email: currentUser.email,
+          email: currentProfile.accountType === "simple" ? "" : cleanEmail(currentUser.email),
+          username: currentProfile.username || "",
+          accountType: currentProfile.accountType || "legacy",
+          legacyEmail: currentProfile.legacyEmail || "",
           name: currentProfile.name || "",
           department: currentProfile.department || "",
           versionName: APP_VERSION.versionName,
@@ -208,19 +223,20 @@
           userAgent: navigator.userAgent
         });
 
-        $("downloadStatus").textContent = "APK 다운로드를 시작합니다. 중복 다운로드 방지를 위해 2분 후 다시 받을 수 있습니다.";
+        $("downloadStatus").textContent = "APK 다운로드를 시작합니다.";
         startCooldownWatcher();
         setTimeout(() => {
           downloadInProgress = false;
           updateDownloadButtonState();
         }, 2500);
         window.location.href = APK_FILE;
-      } catch (e) {
+      } catch (error) {
         const key = downloadLockKey();
         if (key) localStorage.removeItem(key);
         downloadInProgress = false;
         updateDownloadButtonState();
-        alert("다운로드 실패: " + e.message);
+        console.error(error);
+        alert("다운로드 실패: " + (error?.message || error));
         $("downloadStatus").textContent = "다운로드 실패";
       }
     });
