@@ -647,7 +647,7 @@ export async function initReleaseManager(options) {
   if (/admin\.html(?:$|[?#])/.test(path)) {
     await initAdminPage(options);
     try {
-      const manager = await import("./admin-user-download-manager.js?v=20261006-2");
+      const manager = await import("./admin-user-download-manager.js?v=20261006-3");
       await manager.initAdminUserDownloadManager(options);
     } catch (error) {
       console.info("[화이팅] 사용자·다운로드 통합 관리 화면을 불러오지 못했습니다.", error);
