@@ -138,9 +138,13 @@ export async function initAdminUserDownloadManager(options) {
       card.setAttribute("aria-hidden", "true");
     });
   }
-  hideOldCards();
-  const observer = new MutationObserver(hideOldCards);
-  [oldUsersCard, oldLogsCard].filter(Boolean).forEach(card => observer.observe(card, { attributes:true, attributeFilter:["style","class"] }));
+  let oldCardsObserver = null;
+  function activateReplacementUi() {
+    hideOldCards();
+    if (oldCardsObserver) return;
+    oldCardsObserver = new MutationObserver(hideOldCards);
+    [oldUsersCard, oldLogsCard].filter(Boolean).forEach(card => oldCardsObserver.observe(card, { attributes:true, attributeFilter:["style","class"] }));
+  }
 
   let settingsCard = document.getElementById("memberSettingsCard");
   if (!settingsCard) {
@@ -521,6 +525,7 @@ export async function initAdminUserDownloadManager(options) {
       resetRequests = resetSnap.docs.map(doc => ({ id:doc.id, ref:doc.ref, ...doc.data() }));
       logs.sort((a,b) => valueMillis(logTime(b)) - valueMillis(logTime(a)));
       resetRequests.sort((a,b) => valueMillis(b.createdAt) - valueMillis(a.createdAt));
+      activateReplacementUi();
       renderResetRequests();
       renderUsers();
     } catch (error) {
@@ -559,7 +564,6 @@ export async function initAdminUserDownloadManager(options) {
     settingsCard.style.display = admin ? "block" : "none";
     managerCard.style.display = admin ? "block" : "none";
     if (!admin) return;
-    hideOldCards();
     await loadAll();
   });
 }
