@@ -3,7 +3,7 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />\n  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />\n  <meta http-equiv="Pragma" content="no-cache" />\n  <meta http-equiv="Expires" content="0" />
   <title>화이팅 관리자</title>
   <link rel="stylesheet" href="style.css" />
   <style>
@@ -72,7 +72,7 @@
       getFirestore, doc, getDoc, getDocs, collection, setDoc, updateDoc,
       deleteDoc, writeBatch, serverTimestamp
     } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
-    import { firebaseConfig, ADMIN_EMAIL } from "./firebase-config.js?v=20261106-1";
+    import { firebaseConfig, ADMIN_EMAIL } from "./firebase-config.js?v=20261106-2";
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
