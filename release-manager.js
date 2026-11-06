@@ -292,9 +292,6 @@ async function initAdminPage(options) {
       <button class="rm-btn rm-accent" id="rmTest" type="button">2. 테스트 다운로드</button>
       <button class="rm-btn rm-primary" id="rmPublish" type="button">3. 업데이트 적용</button>
     </div>
-    <div class="rm-actions">
-      <button class="rm-btn rm-secondary" id="rmEditCurrentChangelog" type="button">현재 업데이트 내용 수정</button>
-    </div>
     <div id="rmStatus" class="rm-status">관리자 권한 확인 중...</div>
     <details class="rm-advanced">
       <summary>고급 관리</summary>
@@ -326,19 +323,6 @@ async function initAdminPage(options) {
         <div class="rm-modal-actions">
           <button class="rm-btn rm-secondary" id="rmStageCancel" type="button">취소</button>
           <button class="rm-btn rm-primary" id="rmStageConfirm" type="button">준비 등록</button>
-        </div>
-      </section>
-    </div>
-    <div id="rmCurrentChangelogModal" class="rm-modal" hidden>
-      <div class="rm-modal-backdrop" id="rmCurrentChangelogBackdrop"></div>
-      <section class="rm-modal-box" role="dialog" aria-modal="true" aria-labelledby="rmCurrentChangelogTitle">
-        <h3 id="rmCurrentChangelogTitle">현재 업데이트 내용 수정</h3>
-        <div id="rmCurrentChangelogRelease" class="rm-modal-file"></div>
-        <label>업데이트 내용<textarea id="rmCurrentChangelogInput" placeholder="한 줄에 한 항목씩 입력하세요."></textarea></label>
-        <p class="rm-modal-guide">버전명·버전코드·APK는 바뀌지 않고 업데이트 내용만 수정됩니다.</p>
-        <div class="rm-modal-actions">
-          <button class="rm-btn rm-secondary" id="rmCurrentChangelogCancel" type="button">취소</button>
-          <button class="rm-btn rm-primary" id="rmCurrentChangelogSave" type="button">내용 저장</button>
         </div>
       </section>
     </div>
@@ -401,19 +385,6 @@ async function initAdminPage(options) {
     });
   }
 
-  function openCurrentChangelogEditor() {
-    const modal = el("rmCurrentChangelogModal");
-    const input = el("rmCurrentChangelogInput");
-    el("rmCurrentChangelogRelease").textContent = `${current?.versionName || "-"} / code${current?.versionCode || "-"}`;
-    input.value = (current?.changelog || []).join("\n");
-    modal.hidden = false;
-    setTimeout(() => input.focus(), 0);
-  }
-
-  function closeCurrentChangelogEditor() {
-    el("rmCurrentChangelogModal").hidden = true;
-  }
-
   function formRelease() {
     return normalizeRelease({
       versionName: el("rmVersionName").value,
@@ -443,7 +414,6 @@ async function initAdminPage(options) {
     el("rmTest").disabled = !staged?.versionCode;
     el("rmPublish").disabled = !staged?.versionCode;
     el("rmDelete").disabled = !staged?.versionCode;
-    el("rmEditCurrentChangelog").disabled = !current?.versionCode;
     el("rmToggleSuspend").textContent = current?.suspended ? "현재 공개 재개" : "현재 공개 중단";
     el("rmToggleSuspend").className = current?.suspended
       ? "rm-btn rm-primary"
@@ -494,40 +464,6 @@ async function initAdminPage(options) {
       recordedAtText: now.toLocaleString("ko-KR")
     });
   }
-
-  el("rmEditCurrentChangelog").addEventListener("click", () => {
-    if (!current?.versionCode) {
-      showStatus("현재 공개 중인 버전이 없습니다.", true);
-      return;
-    }
-    openCurrentChangelogEditor();
-  });
-
-  el("rmCurrentChangelogCancel").addEventListener("click", closeCurrentChangelogEditor);
-  el("rmCurrentChangelogBackdrop").addEventListener("click", closeCurrentChangelogEditor);
-  el("rmCurrentChangelogSave").addEventListener("click", async () => {
-    const button = el("rmCurrentChangelogSave");
-    try {
-      button.disabled = true;
-      const changelog = el("rmCurrentChangelogInput").value
-        .split(/\r?\n/)
-        .map(value => value.trim())
-        .filter(Boolean);
-
-      await storeApi.setDoc(currentRef, {
-        changelog,
-        changelogEditedAt: storeApi.serverTimestamp()
-      }, { merge: true });
-
-      closeCurrentChangelogEditor();
-      showStatus("현재 공개 버전의 업데이트 내용만 수정했습니다.");
-      await loadAll();
-    } catch (error) {
-      showStatus(`업데이트 내용 수정 실패: ${error.message || error}`, true);
-    } finally {
-      button.disabled = false;
-    }
-  });
 
   el("rmAutoStage").addEventListener("click", async () => {
     const button = el("rmAutoStage");
